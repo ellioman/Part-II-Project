@@ -1,0 +1,2405 @@
+\documentclass[12pt,a4paper,twoside]{report}
+
+\usepackage[pdfborder={0 0 0}]{hyperref}
+
+\usepackage[margin=25mm]{geometry}
+
+\usepackage{bm}
+
+\usepackage{amsmath}
+\DeclareMathOperator{\rect}{rect}
+
+\usepackage{graphicx}
+\graphicspath{ {images/} }
+
+
+\usepackage{parskip}
+
+\usepackage{listings}
+\usepackage{color}
+
+\usepackage{pgfplots}
+
+\usepackage{float}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+%!TeX spellcheck = en-UK
+
+\begin{document}
+
+\pagestyle{empty}
+
+\rightline{\LARGE \textbf{Tom Read-Cutting}}
+
+\vspace*{60mm}
+
+\begin{center}
+
+\Huge
+
+\textbf{Simulating Wavefronts in Real-Time using Wave Particles} \\[5mm]
+
+Computer Science Tripos -- Part II \\[5mm]
+
+Downing College \\[5mm]
+
+\today  % today's date
+
+\end{center}
+
+% Main document
+
+\chapter*{Proforma}
+
+{\large
+
+\begin{tabular}{p{0.3\linewidth}p{0.7\linewidth}}
+
+Name:               & \bf Tom Read-Cutting                       \\
+
+College:            & \bf Downing College                    \\
+
+Project Title:      & \bf  Simulating wavefronts in Real-Time using Wave
+Particles \\
+
+Examination:        & \bf Computer Science Tripos -- Part II, July 2017  \\
+
+Word Count:         & \bf 11366 \\
+
+Project Originator: & \bf Huw Bowles                  \\
+
+Supervisor:         & \bf Dr Rafal Mantiuk                    \\
+
+\end{tabular}
+
+}
+
+\section*{Original Aims of the Project}
+
+The implementation of Wave Particles, a system for approximately simulating the
+generation, propagation and interactions of water-surface waves in real-time
+\cite{Yuksel2007}, on the CPU and GPU in Unity - a commercial game engine. The
+aims are to determine the performance of the system across both the CPU and
+GPU, integrate the system into a commercial game engine, and to possibly
+investigate improvements in the simulation with regards to simulating splashes
+and increasing the performance of the system.
+
+\section*{Work Completed}
+
+All success criteria were met, the system can successfully simulate water
+surface waves in real-time using the Wave Particles system. In addition, several
+extensions have been completed, including the ability to run the system in
+virtual-reality.
+
+\section*{Special Difficulties}
+
+None.
+
+\chapter*{Declaration of Originality}
+
+I, Tom Read-Cutting of Downing College, being a candidate for Part II of the
+Computer Science Tripos, hereby declare that this dissertation and the work
+described in it are my own work, unaided except as may be specified below, and
+that the dissertation does not contain material that has already been used to
+any substantial extent for a comparable purpose.
+
+Signed \\
+
+\includegraphics[width=0.25\linewidth]{signature}
+
+Date \today
+
+\tableofcontents
+
+\listoffigures
+
+\chapter{Introduction}
+
+For my project, I successfully implemented a particle-based real-time
+water-wave simulation system called Wave Particles on both the CPU and GPU
+within the framework of the Unity Game Engine \cite{Yuksel2007}. I have
+completed all the core aims of my project proposal, and two proposed
+extensions: implementing realistic water-rendering shaders and implementing the
+project in virtual-reality. I used some novel techniques to improve the
+performance of the system and ensured that different implementations could
+easily be compared in real-time. One example frame of the animation rendered
+with the implemented method can be seen in Figure
+\ref{fig:wave_particles_example_snapshot}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{wave_particles_default_with_cube_1}
+\caption{An example of water waves produced by a floating cube in my
+implementation.}
+\label{fig:wave_particles_example_snapshot}
+\end{figure}
+
+In this chapter, I introduce the terminology used in the dissertation
+before covering the motivations for engaging in this project. Related work in
+the field of fluid animation will then be covered, in addition to existing work
+that has been done in industry using Wave Particles.
+
+\section{Terminology}
+
+\begin{itemize}
+
+  \item \textbf{Frame-Rate:} The rate at which consecutive images (frames) are
+  rendered by a graphics system.
+
+  \item \textbf{(Soft) Real-Time Graphics:} Real-time programs have strict
+  timing-based functionality requirements. With graphics, the goal is to
+  produce frames in real-time. Hard real-time systems must meet their timing
+  requirements in order to be considered functional, with soft real-time
+  systems it is a goal \cite{gameenginebook}.
+
+  \item \textbf{Game Engine:} A Game Engine is a software framework designed to
+  facilitate the running and creation of a video-game.
+
+  \item \textbf{Height-Field:} Given a surface, a height-field is a function
+  from each $(x, y)$-point on that surface to some scalar height-value $z$.
+  This function can then be used to distort the surface by displacing all
+  points by that function in the vertical direction (in local space).
+
+  \item \textbf{Extended Height-Field / Displacement Map:} These terms, used
+  interchangeably, both refer to extending the concept of a height-field by
+  making the output of its function three-dimensional. Therefore, points on a
+  plane can be displaced both horizontally and vertically.
+
+  \item \textbf{Trochoidal Wave:} A wave that has both longitudinal and
+  transverse components. A full description is provided in Section
+  \ref{sec:wave_particle}.
+
+  \item \textbf{Wave Particle:} A particle on the surface of a body of water
+  encoding a small section of a water-wave. See Section
+  \ref{sec:wave_particle}.
+
+  \item \textbf{Wave Particle System:} A water-wave animation system that uses
+  Wave Particles. See Section \ref{sec:wave_particle}.
+
+  \item \textbf{GPU:} Short for \textbf{Graphics Processing Unit}, the GPU is a
+  piece of hardware designed for graphics rendering and imaging processing.
+  % Most modern PCs and mobile systems have a GPU.
+
+  \item \textbf{GPGPU:} Short for \textbf{General-purpose computing on graphics
+  processing units}, is the use of GPUs for general-purpose computing. This is
+  becoming increasingly common as GPUs are well-equipped for massively parallel
+  computation.
+
+  \item \textbf{VRAM:} Short for \textbf{Video Random Access Memory}, this is
+  is the main pool memory that GPUs have access to. It is usually distinct from
+  RAM used by the CPU, and connected to it via a bus. However, some modern
+  architectures do have a unified pool of memory shared by the CPU and GPU
+  \cite{AMDHuma}.
+
+  \item \textbf{Triangle:} GPUs are optimised for a specific form of
+  three-dimensional graphics rendering where objects and models are formed of
+  many triangles.
+
+  \item \textbf{Vertex:} A vertex in three-dimensional graphics is the vertex
+  of one or more polygons (such as triangles).
+
+  \item \textbf{Texture:} A texture is a one-, two-, or three-dimensional array
+  of pixels stored in graphics memory.
+
+  \item \textbf{Shader:} A shader is a piece of code that runs on the GPU. There
+  are different types of shaders with different purposes.
+
+  \item \textbf{\texttt{ComputeBuffer}:} An array-like buffer stored on the GPU.
+
+\end{itemize}
+
+\section{Motivation}
+
+% OLD
+% My motivation will cover why there is a demand for water simulation in
+% real-time applications and the available options for simulating water. The
+% limitations of existing systems will be shown - including how three-dimensional
+% techniques are too computationally complex for real-time graphics and how most
+% two-dimensional techniques are only able to simulate one-way interactions. This
+% will lead into why the decision was made to implement the Wave Particles method
+% as a real-time water simulation technique.
+
+Simulating water in (soft) real-time (meaning a bare minimum operating speed of 30
+frames per second \cite{gameenginebook}), continues to be a
+big challenge, consistently being used as a benchmark for the current state of
+real-time graphics \cite{gamingmobydick}. With the emergence of both Virtual and
+Augmented Reality, the applications of complex real-time computer graphics are
+increasing \cite{ARApplications} \cite{VRGrowth}.
+
+% Section \ref{sec:related_work} explores existing water simulation techniques in
+% detail, showing how they ultimately come in two flavours - full
+% three-dimensional simulations that aim to capture in detail how water flows,
+% and two-dimensional surface simulations that aim to simulate waves.
+
+% OLD
+% Three-dimensional systems can be unstable and complex for artists to use, which
+% while suitable for offline renders such as films - only a single, deliberate
+% 'take' of a particular scene is required - is completely out of the question in
+% games as stability must hold-up over the course of hours of user interaction.
+% Furthermore, they are computational expensive, and although are now possible to
+% simulate in real-time, still use a lot of resources which could be spent on
+% other systems in a Game Engine - as enemies, environments, post-processing
+% effects, objects and even networking
+
+% Two-dimensional systems can be accurate, convincing and cheap enough for
+% real-time applications: many simply need to provide an entertaining and fun
+% experience to a user on consumer-level hardware such as a PC, games console or
+% even a smartphone. As discussed in Section \ref{sec:related_height_map}, a
+% plethora of techniques have developed which aim to simulate the generation and
+% interactions of water surface-waves on a two-dimensional plane - massively
+% reduce the level of computation required, at the expense of not being able to
+% accurately simulate splashes, vortices and other effects only a fully-realised
+% 3D simulation could provide \cite{GPUGems}.
+
+Wave Particles are a two-dimensional technique proposed by Yuksel at al. that
+capture how wavefronts form and propagate by representing them with particles
+\cite{Yuksel2007}. Incredibly large numbers of Wave Particles can be active, as
+only a fraction of them need to be updated every frame - which is done in order
+to subdivide them so that they can represent dispersing waves. They are a
+simple idea that is well suited to the GPU; as each particle can be treated
+independently. Furthermore, they are deterministic and allow for relatively
+complex two-way fluid-object interactions. They have also been shown to be
+incredibly flexible and exceptionally easy for artists to control
+\cite{Tatarchuk:2016:ARR:2897826.2940291}. Finally, there is a lot of room for
+them to be extended in a variety of ways (Section \ref{sec:future_extensions}).
+
+My goal in implementing Wave Particles was to rebuild the system from the
+ground-up in order to simulate surface-waves in real-time. Furthermore, I aimed
+to analyse how well the system performed within a complex commercial game
+engine - building the system in the Unity framework for this purpose. Finally,
+I wanted to explore how they could be optimised by using GPU compute
+shaders.
+
+%POSSIBLE: summary
+
+\section{Related Work}
+\label{sec:related_work}
+
+Here I give a broad overview of the field of Fluid Animation, how it relates to
+Computational Fluid Dynamics, and its development in computer graphics, before
+showing where wave simulation using displacement maps fits into the field.
+Finally, I demonstrate existing work that has been done using Wave Particles.
+
+\subsection{Fluid Animation}
+
+% ENSURE: actual papers are mentioned as a lot of research was done!
+
+Water simulation falls within the field of fluid simulation, which itself has two
+overlapping sub-fields - that of fluid animation and computational fluid
+dynamics. The former concerns itself solely with convincing visual effects
+whereas the latter field is used to study the behaviour of fluids
+scientifically. This dissertation concerns itself with fluid animation.
+
+Fluid animation is itself a broad field, with most fluid animation systems
+implementing some approximation or simplification of the Navier Stokes
+equations \cite{NavierStokes} \cite{Stam:1999:SF:311535.311548}
+\cite{Irving:2006:ESL:1179352.1141959}. The most comprehensive approach to
+fluid animation is to implement a full three-dimensional simulation system.
+
+% These come in two main flavours,
+% Lagrangian and Eulerian.
+
+% Lagrangian techniques use particles in a three-dimensional system to simulate
+% fluid. Smoothed Particle Hydrodynamics (SPH) are such a technique introduced
+% into computer graphics by Stam and Fiume in 1995 \cite{StamFiume1995}. SPH
+% systems have been further extended and improved in various ways - enforcing
+% incompressibility to model liquids and adaptive models that reduce the total
+% number of particles required, whilst maintaining good quality simulations.
+
+% Eulerian techniques are grid-based, offering a numerical solution to the Navier
+% Stokes equations. A fluid is divided into cells in order to discretise it -
+% first being introduced to computer graphics by Foster and Metaxas in 1996
+% \cite{Foster:1996:RAL:244304.244315}. The stable fluids method introduced by
+% Stam in 1999 used semi-Lagrangian advection to create a relatively efficient
+% and unconditionally stable simulation using a Eulerian system
+% \cite{Stam:1999:SF:311535.311548}.
+
+% While powerful, these techniques have been traditionally limited to the domain
+% of offline rendering: not being suitable for real-time rendering. Furthermore,
+% many systems, such as Smoothed Particle Hydrodynamics can be unstable without
+% sufficiently small time-steps \cite{SPH}, and have a host of other issues not
+% making them suitable for real-time rendering.
+
+% However,
+
+Recent developments in General-purpose computing on graphics processing units
+(GPGPU) and an increase in the power of GPUs have allowed real-time
+three-dimensional particle-based fluid animation techniques to be developed,
+including Position Based Fluids (PBF) by Macklin and M{\"u}ller in 2013
+\cite{Macklin2013}. However, these are still intensive and limited to small
+fluid-bodies. Additionally, any resources saved by implementing something more
+simple can be used on other components of a real-time system (Physiscs, AI,
+Graphical Effects, etc.).
+
+With liquids such as water, a common simplification is to focus on animating
+waves on the surface of a body. The reason for this is that doing so is
+computationally simple, as the results of such a simplified simulation can be
+rendered by displacing vertices in a mesh. This will be covered in the next
+section.
+
+\subsection{Wave Simulation \& Height-Fields}
+\label{sec:related_height_map}
+
+An explanation of height and displacement fields will be given, and how they
+allow for very simple wave simulations. A few methods will then be described
+which use these data-structures - including the sum-of-sines approach,
+Gerstner Waves using Fast Fourier Transforms, Texture Shifting, and Wave
+Particles.
+
+A height-field is essentially a function of the form $z = f(x, y)$, mapping
+points $(x, y)$ on a 2D plane to some height $z$. This formulation is
+frequently used for water surfaces, as it is faster than 3D simulation methods,
+however it is limited to vertical motion on a water surface. Furthermore,
+height-field methods also incorrectly model water-waves, which are trochoidal
+in nature - having both longitudinal and latitudinal components
+\cite{Gerstner1802}.
+
+Some of the limitations of height-field-based methods can be overcome with a
+small extension - associating horizontal displacement to points on a 2D plane
+in addition to the vertical one; more accurately called a displacement map.
+This structure will also be referred to as an extended height-field - matching
+the naming conventions in the original Wave Particles paper \cite{Yuksel2007}.
+This structure is sufficient for most wave simulations, although it still can't
+handle topological changes such as breaking waves.
+
+Most two-dimensional systems are one-way. Meaning that ambient waves will be
+simulated using artist-controlled variables and will physically exert forces on
+floating objects, however objects themselves won't generate waves which have an
+effect on the simulation. A common workaround to this is to pre-bake visual
+effects, like splashes and ripples in order to create the illusion of a two-way
+simulation system, even if the generated waves are purely visual \cite{RTR3}.
+Figure \ref{fig:uncharted_no_wake} shows the results of the one-way system used
+in \textit{Uncharted 4} (See Section \ref{sec:related_wave_particles}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{uncharted_no_wake}
+\caption{A screenshot of \textit{Uncharted 4}, an example of a one-way
+two-dimensional wave-simulation system. Although the boat generates white-foam
+as a texture, no wakes are created \cite{Tatarchuk:2016:ARR:2897826.2940291}.}
+\label{fig:uncharted_no_wake}
+\end{figure}
+
+A common technique for simulating turbulent oceans is the sum-of-sines
+approach, where sine waves of multiples frequencies are used
+\cite{GamaSutra3DWater}. This technique is slow, limiting the number of wave
+frequencies that can be simultaneously computed. These can be supplemented with
+texture shifting, a technique where multiple normal maps are tiled and layered
+in order to imitate small ambient waves - a technique that can suffer from
+visible patterns forming, destroying the illusion of ambient waves \cite{RTR3}.
+
+Gerstner waves are an efficient one-way method for ocean simulation that use
+Fast Fourier Transforms, enabling tens of thousands of waves at once
+\cite{Tessendorf2001} \cite{GPUGems}. However, FFT-based systems are hard for
+artists to control, something which is important
+\cite{Tatarchuk:2016:ARR:2897826.2940291}. An implementation of this technique
+can be seen in Figure \ref{fig:gerstner_example}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{gerstner_example}
+\caption{WebGL rendering of Gerstner using Fast Fourier Transforms
+\cite{DavidLiFFT}.}
+\label{fig:gerstner_example}
+\end{figure}
+
+The last height-field based technique is Wave Particles, which can be used to
+implement both one-way (Section \ref{sec:related_wave_particles}) and true
+two-way systems \cite{Yuksel2007}.
+
+Some systems have been developed that combine both two and three-dimensional
+techniques \cite{Irving:2006:ESL:1179352.1141959}. However, these have so far
+only been used in offline rendering.
+
+% This section gave a brief explanation of the height-field, showing how
+% limitations allow for much faster wave simulations that fully three-dimensional
+% systems. Common height-field-based techniques such as sum-of-sines,
+% texture-shifting and Gerstner waves were explained - including how they are
+% limited to one-way interactions. It was then stated that Wave Particles, the
+% subject of this dissertation, overcame this limitation. Finally, hybrid systems
+% using both two and three-dimensional techniques have been used in offline
+% rendering.
+
+\subsection{Wave Particles}
+\label{sec:related_wave_particles}
+
+Here existing commercial use of Wave Particles will be explored; particularly
+\emph{Naughty Dog}'s simulation of turbulent oceans and rivers using one-way
+Wave Particle systems.
+
+\emph{Naughty Dog} used Wave Particle techniques in the games \emph{Uncharted
+3} and \emph{4} \cite{Tatarchuk:2016:ARR:2897826.2940291}
+\cite{OchoaAndHolder2012}. Rather then being used to create convincing
+fluid-object interactions alongside convincing wave generation; they were
+employed to generate noise on-top of a Gerstner Wave-based ocean simulation
+\cite{Tessendorf2001}. This was done by layering Wave Particle systems of
+different amplitudes and frequencies - creating a system resembling turbulent
+water.
+
+\textit{Uncharted 4}, extended this technique from oceans to rivers by
+advecting the animation in the direction of water-flow generated from an
+offline 3D simulation.
+
+These novel uses of Wave Particles lack one of its benefits - of providing
+cheap two-way fluid-object interactions, rather than one way fluid-to-object
+systems.
+
+\subsection{Summary}
+
+I gave an overview of the techniques used in Fluid Animation, including
+three-dimensional systems. I introduced Position Based Fluids - a real-time
+three-dimensional fluid simulation that can run on the GPU. I then explained
+the limitations of these techniques and how their complexity still makes them
+unsuitable for large real-time applications. Height field-based techniques
+frequently used in games were then introduced. Finally, I showed where Wave
+Particles are placed in the field, and existing work that has been done using
+them.
+
+\chapter{Preparation}
+
+This chapter covers how I understood the mathematics behind Wave Particles,
+from generating waves on a surface at a given time $t$, to how
+plausible-looking fluid-object interactions occur within the system. I will
+also cover the approach taken to rendering.
+
+Secondly, I explain the approach taken to tackling the project from a
+software engineering perspective: my starting point, the software I used and
+finally the principles I applied in day-to-day development.
+
+% ENSURE: DESCRIBE WORK UNDERTAKEN BEFORE CODE WAS WRITTEN
+
+% ENSURE: SHOW HOW PROJECT PROPOSAL WAS REFINED AND CLARIFIED, SO THAT
+% IMPLEMENTATION STAGE WENT SMOOTHLY
+
+% ENSURE: CITE NEW PROGRAMMING LANGUAGES (C\#, HLSL), AND SYSTEMS WHICH HAD TO BE
+% LEARNT AND MENTION COMPLICATED THEORIES AND ALGORITHMS WHICH REQUIRED
+% UNDERSTANDING
+
+\section{The Mathematics behind Wave Particles}
+
+Here I cover the mathematics behind Wave Particles, defining a Wave Particle
+and how it approximates waves on a water surface. Then I discuss the nature of
+water waves, before progressing to how the distortion to the surface can be
+calculated. Finally, I explain how subdivision works and discuss material
+appearance.
+
+\subsection{The Wave Particle}
+
+\label{sec:wave_particle}
+
+I give an outline of the Wave Particle, its representation on a surface, and
+how a displacement map is obtained at time $t$. Each component of the Wave
+Particle is further explained and explored, covering its starting time $t_0$,
+velocity $\bm{v}$, amplitude $a$, radius $r$, origin $\bm{o}$, and dispersion
+angle $\theta$.
+
+Within a Wave Particle system, each particle represents a moving unit of
+distortion on a surface - contiguous wavefronts being represented by an arc of
+particles where each are within $r/2$ of each other. In order to prevent
+expanding wavefronts from fragmenting as constituent particles separate, each
+Wave Particle stores both the origin $\bm{o}$ and dispersion angle $\theta$ of
+the wave section it constitutes. A Wave Particle will subdivide based on this,
+its radius $r$, and its velocity, such that the overall wavefront does not
+become discontinuous. This emulates waves on the surface of a liquid in both
+appearance and behaviour, satisfying the two-dimensional wave equation
+(Equation \ref{eq:wave}) \cite{Yuksel2007}.
+
+\begin{equation}\label{eq:wave}\frac{\partial ^2 z}{\partial x^2} + \frac{\partial ^2
+z}{\partial y^2} = \frac{1}{v^2} \frac{\partial ^2 z}{\partial t^2 }
+\end{equation}
+
+Here $x$, $y$, and $z$, represent motion in the $x$-, $y$-, and $z$-axes
+respectively, with $z$ being the vertical axis. $v$ is the speed of a wave,
+while $t$ represents time.
+
+The displacement map of surface-waves created by Wave Particles at time $t$ is
+obtained from the superposition of all particles at time $t$ in the system.
+
+\subsubsection{Water Surface-Waves}
+
+Water surface-waves are trochoidal in nature - having longitudinal and
+latitudinal components. This result comes from an exact solution of the Euler
+equations for periodic surface gravity waves \cite{Gerstner1802}. These
+equations are a particular form of the Navier-Stokes equations for fluids.
+Gerstner waves describe progressive surface waves of an incompressible fluid of
+infinite depth \cite{Gerstner1802}. Thus the trajectories of points on a
+water-surface will be that of a closed circle - important in emulating the
+appearance of water.
+
+% TODO: add figure of the closed-circle movement of a Wave Particle
+% https://commons.wikimedia.org/wiki/File:Trochoidal_wave.svg
+
+% Equations \ref{eq:trochoidal_x} and \ref{eq:trochoidal_y} both describe the
+% longitudinal and latitudinal components of trochoidal waves respectively.
+
+% \begin{equation}\label{eq:trochoidal_x}X(a,b,t)=a+\frac{e^{kb}}{k}sin{(k(a+ct))}\end{equation}
+
+% \begin{equation}\label{eq:trochoidal_y}Y(a,b,t)=b-\frac{e^{kb}}{k}cos{(k(a+ct))}\end{equation}
+% % TODO(Rafal): explain symbols
+
+\subsection{Calculating Distortion}
+
+I explain the nature of water surface-waves and how the distortion that
+each Wave Particle generates can be calculated such as to match these waves.
+
+Given a Wave Particle at position $(x_p, y_p)$, of amplitude $a_p$, and with
+radius $r$, the displacement it causes at any position $(x, y)$ on a plane can
+be calculated using Equation \ref{eq:particle_distortion},
+
+% POSSIBLY: Look into splitting equations
+
+\begin{equation} \label{eq:particle_distortion}
+\begin{split}
+\bm{X}_p(x,y)=a_p(\gamma-B\sin{(\gamma)})\frac{(x_p-x,y_p-y)}{||(x_p-x,y_p-y)||}\rect(\frac{||(x_p-x,y_p-y)||}{r}) \\
+Y_p(x,y)=\frac{a_p}{2}(\cos{(\gamma)} + 1)\rect(\frac{||(x_p-x,y_p-y)||}{r})
+\end{split}
+\end{equation}
+
+where $\gamma=\sqrt{(r-(x-x_p))^2+(r-(y-y_p))^2}$ and rectangle function
+$\rect(x)$ is $1$ for $|x| < 1$, $\frac{1}{2}$ for $|x|=1$, and $0$ otherwise.
+$Y_p$ gives the transverse component, whilst $\bm{X}_p$ describes the
+longitudinal component - giving the trochoidal effect
+\cite{Tatarchuk:2016:ARR:2897826.2940291}. $B$ is a parameter ranging from $0$
+to $1$ used to adjust the \textit{peakiness} of a Wave Particle (Figure
+\ref{fig:distortion_diagram}).
+
+\begin{figure}[h]
+\def\svgwidth{\linewidth}
+\input{images/wave_particle_side_on.pdf_tex}
+\caption{Diagram showing the distortion caused by single Wave Particle at time
+$t$. The particle starting at position $p$, travels a distance $d$, at
+velocity $\bm{v}$, for time $t$. It has amplitude $a$ and radius $r$.}
+\label{fig:distortion_diagram}
+\end{figure}
+% TODO(Rafal): plot this graph in matplotlib?
+
+To calculate the displacement caused by all Wave Particles in the system at any
+point on the plane, we take the sum of all particles (Equation
+\ref{eq:particle_distortion_sum})
+
+\begin{equation} \label{eq:particle_distortion_sum}
+\begin{split}
+\bm{X}(x,y) & =\sum_{p}\bm{X}_p(x,y) \\
+Y(x,y) & =\sum_{p}Y_p(x,y)
+\end{split}
+\end{equation}
+
+$\bm{X}$ and $Y$ describe the total longitudinal and transverse displacement at
+any point on the plane respectively.
+
+\subsection{Subdivision}
+
+\label{sec:subdivision}
+
+I explain how subdivision allows Wave Particles to represent a contiguous
+dispersing wavefront with a given origin and angle.
+
+Wave Particles in any arbitrary arc, where each particle is within $r/2$ from
+the next, form a contiguous wavefront satisfying the Wave Equation (Equation
+\ref{eq:wave}) \cite{Yuksel2007}. Therefore a dispersing wavefront composed of
+such a system of particles naturally decreases in amplitude and remains
+contiguous until separation distances of the particles exceed $r/2$.
+
+If the Wave Particles are able to independently subdivide at such a point, we
+can represent such wavefronts for an arbitrary length of time and perform
+subdivisions in parallel - important in efficiently implementing such a system.
+
+To achieve this, each Wave Particle is given both an origin $\bm{o}$ and
+dispersion angle $\theta$. Figure \ref{fig:subdivision_diagram} demonstrates
+and explains how subdivision then works. It is important to note that when a
+Wave Particle is created, the time at which it will subdivide can be
+pre-computed.
+
+\begin{figure}[h]
+\def\svgwidth{\linewidth}
+\input{images/wave_particle_subdivision.pdf_tex}
+\caption{Diagram showing how a Wave Particle generated at a position $\bm{o}$
+with dispersion angle $\theta = \pi$, amplitude $a$, and radius $r$ subdivides.
+It subdivides (the orange arrows) once into three particles when it has
+travelled by a distance $d$ such that $d\theta = r/2$. These new particles have
+the same speed, origin and radius, but a third of the amplitude and dispersion
+angle. When they have travelled a distance $d$ such that $3d\theta/3=r/2$, they
+independently subdivide again. Blue dashed lines indicate the areas individual
+particles sweep out. Therefore, no two particles can separated by more than
+half their radii, maintaining a contiguous wavefront.}
+\label{fig:subdivision_diagram}
+\end{figure}
+
+\section{Starting Point}
+
+I had read various papers surrounding water and fluid simulation, but hadn't
+yet revised all the mathematics that was involved in all of the systems.
+
+I started with an empty Unity project and had to learn the framework. Therefore
+I had to learn C\# which is fortunately similar to the more familiar Java
+\cite{UnityScripts}.
+
+Furthermore, whilst having theoretical understanding of the GPU, I was
+unfamiliar with programming for one, having to learn \textit{HLSL}, the shading
+language of Unity \cite{UnityShaders}.
+
+I used the example dissertation to construct my own.
+
+Finally, Huw Bowles, a professional graphics programmer, had given me advice on
+which papers to read and which technologies to use, ensuring I started in the
+right direction.
+
+\section{Software Used}
+
+Here I describe the software used in implementing and evaluating Wave Particles
+- including why I decided to use the Unity game engine, which programming
+languages I used, the development environment I worked in, and the tools I used
+for profiling and debugging.
+
+\subsection{Game Engine}
+
+I justify why I chose the Unity game engine to achieve my goal of implementing
+the project within one.
+
+Unity is a versatile, scalable, and portable cross platform game engine used by
+both independent developers and big publishers. Its ease-of-use means that
+shader-programming is straight-forward. However, C\# being the most
+commonly-used language in Unity means garbage-collection can cause performance
+issues in real-time applications unless handled carefully
+\cite{UnitySharpWins}. %POSSIBLE MOVE SENTENCE ABOVE
+
+The ease of writing portable shaders with minimal set-up is the reason why I
+settled on using Unity. This was extremely important I had to implement Wave
+Particles on the GPU. Furthermore, my inexperience of writing shaders before
+embarking on the project made it important to pick a solution providing minimal
+friction, so the focus could be on implementation as opposed to set-up and
+boilerplate.
+
+Although garbage-collection is an issue in Unity, Section
+\ref{sec:evaluation_memory} describes how this can minimised as memory tends to
+be fixed and limited in real-time graphics. Unfortunately, multi-threading
+support is still limited in Unity \cite{UnityBadThreading}.
+
+\subsection{Programming Languages}
+
+Here I cover C\#, HLSL and Python, programming languages I used on the project.
+
+\textbf{C\#:} Unity offers the ability to program in a custom variant of
+JavaScript (called UnityScript) or C\# \cite{UnityScripts}. I settled on C\# as
+it is the most supported and documented of the two \cite{UnitySharpWins}. C\#
+is similar to C++ and Java.
+
+\textbf{HLSL:} HLSL is a shader language developed by Microsoft. Shader
+languages are programs that run on the GPU. Unity can automatically
+cross-compile HLSL programs to different platforms, therefore, using it is
+encouraged \cite{UnityShaders}.
+
+\textbf{Python:} Python was used in evaluation. I was familiar with the
+language and knew that powerful libraries existed for numerical analysis. I
+learnt \textit{NumPy}, \textit{pandas}, and \textit{Matplotlib} so I could
+process my data and generate graphs \cite{NumPy} \cite{pandas}
+\cite{Matplotlib}.
+
+\subsection{Development Environment}
+
+This section gives an overview of Git, Travis CI and Visual Studio, the tools
+featuring in my development environment.
+
+\textbf{Git \& GitHub:} Using Git as version control was the first thing I
+setup, due to its importance and ease-of-use. Furthermore, I committed all
+documents and software to version control immediately upon creating their
+stubs.
+
+I used branching and tags to improve productivity, as they allowed for me to
+context-switch between completing different features and keep track of
+particularly notable parts of the project for this dissertation.
+
+GitHub was used to provide a back-up of the project repository that served to
+keep the project in sync between different platforms.
+
+\textbf{Unit Testing \& Travis CI:} Unit testing is a good way to sanity-check
+assumptions being made, help ensure changes made are non-breaking, and assist
+in planning the interfaces of systems.
+
+Unity provides a built-in unit tester that can hook into the engine
+\cite{UnityEditorTestRunner}. However, Travis CI, an online system for
+automatically running unit tests GitHub, does not provide native support for
+Unity or even Windows \cite{TravisCILanguages} \cite{TravisCIOS}.
+
+I wrote a script that automatically downloads the OSX version of Unity and
+installs it onto a Travis CI OSX instance, running the Unit Tests from there.
+The code I used for this is given in Appendix \ref{app:travisci}.
+
+\textbf{Visual Studio:} Visual Studio was used because it is well supported,
+integrates well with Unity and is the most common IDE used in the games
+industry \cite{UnityVisualStudio} \cite{gameenginebook}.
+
+\subsection{Profiling and Debugging Tools}
+
+Profiling is extremely important when developing performance critical
+applications. With many modern games, the 90-10 rule applies: 10\% of the code
+runs 90\% of the time \cite{gameenginebook}. This means that optimising that
+10\% is extremely important - profiling can be used help identify and optimise
+that code in an evidence-based manner. Finally, profiling was used as part of
+the evaluation.
+
+\subsubsection{Unity}
+
+Unity has a powerful integrated profiler, shown in Figure \ref{fig:profiler}.
+It provides a variety of features, including the ability profile arbitrary
+segments of code, memory allocations, number of calls, running time, graphics
+memory allocations, and GPU usage.
+
+I used the MIT licensed \textit{Unity Profiler Data Exporter} to export
+profiling data to the JSON format so that it could be analysed in Python
+\cite{UnityProfilerDataExporter}. This was done as Unity does not provide any
+native functionality for exporting profiling data.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{profiler}
+\caption{A screen-shot of Unity's profiler. Various provided features can be
+seen here, including the ability to drill down to functions, what percentage of
+each frame they take, their run time, and their memory allocations.}
+\label{fig:profiler}
+\end{figure}
+
+\subsubsection{RenderDoc}
+
+RenderDoc (Figure \ref{fig:renderdoc}) is a graphics profiling tool I used in
+debugging and image exporting, as it allows users to analyse the state of the
+graphics pipeline \cite{RenderDoc}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{renderdoc}
+\caption{Screen-shot of RenderDoc running on the project.}
+\label{fig:renderdoc}
+\end{figure}
+
+
+\section{Software Engineering Principles}
+
+% ENSURE: CHANGES TO STARTING POINT DIFFERENT FROM PROJECT PROPOSAL ARE EXPLAINED
+
+% POSSIBLE: READ OTHER STARTING POINTS FOR TYPICAL CHANGES/TENSE
+
+% ENSURE: PROFFESIONAL APPROACH WAS EMPLOYED
+
+% ENSURE: IT HAS THE QUALITIES REQUIRED TO MAKE A GOOD PREPERATION chapter (BASED
+% ON OTHER PROJECTS I HAVE READ)
+
+% ENSURE: IT CONTAINS A subsection HEADED "Requirements Analysis" AND INCORPORATES
+% OTHER REFERENCES TO THE TECHNIQUES OF SOFTWARE ENGINEERING.
+
+%TODO: Write section introduction
+
+The Wave Particles system is a pipeline of stages that runs once per frame,
+described in the Section \ref{sec:implementation_pipeline}. As there are many
+different strategies for implementing each stage, I ensured they each had a
+well-defined interface allowing for different possible implementations.
+
+\subsection{Software Development Model}
+
+As so much was unknown going into the project, having a reliable software
+development model was a priority. Firstly, I prototyped a two-dimensional
+version of Wave Particles in a simple two-dimensional engine called GameMaker
+so ideas could be tested (Figure \ref{fig:wave_particles_prototype})
+\cite{GameMakerStudio}. I then designed the pipeline using the
+\textit{waterfall model}, such that each component could then be independently
+designed, implemented and analysed using the \textit{spiral model}
+\cite{WaterfallModel} \cite{SpiralModel}. Achieving visual results early was
+important, therefore I decided to focus on the visual stage first -
+implementing stubs for all the other parts. This was done by designing and
+hard-coding a system with a single Wave Particle. From there, I iteratively
+fleshed out the project with new features as my understanding of the project
+and Unity grew.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{wave_particles_prototype}
+\caption{A Wave Particles prototype implemented in GameMaker Studio.}
+\label{fig:wave_particles_prototype}
+\end{figure}
+
+\subsection{Requirements Analysis}
+
+I used the \textit{MoSCoW} method in order to prioritize the requirements and
+extension ideas from the project proposal, labelling parts of the project
+\textbf{Must have}, \textbf{Should have}, \textbf{Could have}, and
+\textbf{Won't have} as listed below \cite{MoSCoWMethod}.
+
+\subsubsection{Project Requirements}
+
+\begin{itemize}
+
+\item \textbf{Must have} a Wave Particle simulation in Unity that runs on both
+the CPU and GPU with the ability to easily compare the performance of each.
+
+\item \textbf{Must have} the complete GPU-based version of the simulation run
+at least 30 frames-per-second with 5000 Wave Particles present.
+
+\item \textbf{Must have} a 2D top-down overlay-visualiser of the wave-particles
+to enable easy visualisation of what is going on, for both explanatory and
+debugging purposes.
+
+\item \textbf{Must have} a basic water renderer for the wavefronts generated by
+the Wave Particles.
+
+\item \textbf{Must have} measurements comparing the performance of the CPU and
+GPU based implementations of specific features, in addition to, data of how the
+number of Wave Particles affect the performance of the simulation alongside the
+resulting visual outcome.
+
+\item \textbf{Should have} a system to manage the Wave Particles and object
+placement within the Unity editor.
+
+\item \textbf{Should have} A fluid-object interaction system on both the CPU
+and GPU with the same criteria as above.
+
+\end{itemize}
+
+\subsubsection{Extensions}
+
+\begin{itemize}
+
+\item \textbf{Could have} more realistic water shaders for rendering the water,
+measuring how they affect the performance of the simulation in addition to how
+they compare to the real physical phenomena they represent.
+
+\item \textbf{Could have} the ability to view the scene in virtual-reality.
+Importantly, this requires running at a framerate of at least 90 frames per
+second to help prevent motion sickness that can be exacerbated by lower
+framerates.
+
+\item \textbf{Won't have} the ability to handle the degenerate cases where
+splashes should occur using a simplified Smoothed Particle Hydrodynamics-like
+simulation.
+
+\end{itemize}
+
+\section{Summary}
+
+This chapter discussed the initial research I did and the mathematics behind
+the Wave Particles system. Furthermore, I described the fundamental features I
+used to implement the project. Finally, I demonstrated the tools and
+development environment I used in creating the project, in addition to the
+software engineering principles I employed such as the \textit{MoSCoW} method.
+
+\chapter{Implementation}
+
+% ENSURE: WHAT WAS PRODUCED IS DESCRIBED (THE PROGRAMS THAT HAVE BEEN WRITTEN)
+
+% ENSURE: DESIGN STRATEGIES THAT LOOKED AHEAD TO THE TESTING STAGE
+
+Here I discuss how I implemented the Wave Particles system. I first explain
+some of the key insights that can be derived from theory which enable an
+efficient implementation. I then describe the concrete data-structures that I
+created - including the Wave Particles pipepline. Following that, I delve into
+the details of how I implemented different parts of the system, including
+subdivision, Wave Particle reflections, displacement map generation,
+fluid-object interactions, rendering, and novel techniques I developed to
+improve performance. Finally, I discuss how I performed profiling and
+optimisation before summarising the chapter.
+
+\section{Insights}
+
+Here I describe the insights that allow the Wave Particle
+system to be implemented in software - specifically how the theory developed
+into implementation. I start by describing the system from an algorithmic
+point of view, including approximations and assumptions that can be made in
+order to enable key optimisations and expose parallelisation opportunities in
+subdivision. Finally, I describe how convolution can be used to
+efficiently generate the displacement map.
+
+\subsection{Computing Subdivisions and Reflections}
+
+One insight that allows the Wave Particles system to comfortably run at
+real-time frame rates, is that once generated, a Wave Particle is never
+modified except on subdivision and reflection with static obstructions.
+Furthermore, the frame in which a Wave Particle will need to be
+subdivided/reflected can be calculated at the time it is generated. This means
+that for any given frame, we know the set of Wave Particles that need to be
+iterated over for these operations. The result of this, is that even in a
+system with many thousands of Wave Particles, only a fraction need to be
+updated, however, iteration over all of them is still required when generating
+the displacement field.
+
+\subsection{Obtaining the Displacement Map Using Convolution}
+\label{sec:implementation_overview_obtain_displacement_map}
+
+This section will cover how I used convolution to calculate the displacement
+map generated by a system of Wave Particles \cite{Yuksel2007}.
+
+In software, I used a two-dimensional image mapped to the water's surface to
+encode the displacement map - each pixel encoded the displacement at that point
+on the water's surface. Convolution can be used to efficiently calculate the
+desired displacement map given a system of Wave Particles, if we assume each
+has a fixed and shared radius, $r$.
+
+The naive approach to calculating the displacement map would be, for every
+pixel, to iterate through every Wave Particle in the system and calculate its
+total contribution to the displacement at that pixel - a direct implementation
+of Equation \ref{eq:particle_distortion_sum}. Pseudocode for this is show
+below.
+
+\begin{lstlisting}
+for each pixel
+    for each wave_particle
+        pixel += calculate_distortion(wave_particle)
+    end
+end
+\end{lstlisting}
+
+However, given that each Wave Particle has the same radius, the distortion each
+generates has the same form - simply with different amplitudes, which can be
+encoded in a two-dimensional filter kernel. Therefore, I generated the final
+displacement map by \textit{splatting} the amplitude of each Wave Particle to
+an image of an identical resolution to the displacement map. By convolving this
+image with a Wave Particle kernel, I could efficiently compute the displacement
+map, encoding the total distortion caused by all the Wave Particles in a given
+system. Figure \ref{fig:convolution_2D_example} shows the result of convolving
+the Wave Particle kernel with a splatted image. This gives the same result as
+Equation \ref{eq:particle_distortion_sum} at a lower computational cost
+\cite{Yuksel2007}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.1\linewidth]{convolution_2D_kernel}
+\includegraphics[width=0.4\linewidth]{splat_texture}
+\includegraphics[width=0.4\linewidth]{displacement_map_texture}
+\caption{The left-most image shows the convolution kernel generated from
+Equation \ref{eq:particle_distortion}. The middle image shows the result of
+splatting the amplitudes of a system of Wave Particles. The right-most image
+shows the final displacement map: The result of convolving both with each
+other.}
+\label{fig:convolution_2D_example}
+\end{figure}
+
+Although the kernel is non-separable, Yuksel et al. describe a one-dimensional
+approximation that my system doesn't implement \cite{Yuksel2007}.
+
+% OLD
+
+% \section{Design Strategies}
+
+% This section describes some of the design decisions made for this project.
+% Including how I prepared for evaluation and used Unity.
+
+% \subsection{Preparing for Evaluation}
+
+% One of the main goals of the project was to be able to easily compare the
+% performance of specific features and implementations of those across both the
+% GPU and CPU, the design of the project had to take this into account. In order
+% for this to be achieved, the following criteria would have to be met:
+
+% \begin{itemize}
+
+%  \item  Easy, consistent profiling that can be done on a granular level
+
+%  \item The ability to easily switch between implementation strategies for
+%  components of the system (possibly even at runtime)
+
+% \end{itemize}
+
+% The latter was especially important to get running as early as possible, as it
+% enabled me to easily compare earlier, naive implementations of the Wave
+% Particles system I created and compare them with optimisations that were
+% constructed as the project continued.
+
+% \subsection{Using Unity}
+
+% Ensuring the Wave Particles system was not only implemented, but also heavily
+% integrated into the Unity SDK and game engine was vital. Not only because doing
+% so gave the Wave Particle system access to the powerful pre-existing libraries
+% and tools Unity provides, but also because it can expose parts of the system
+% which may need to be adapted to make it suitable in a more fully-featured
+% whole.
+
+% However, care was also needed to make sure the core implementation details and
+% algorithms were as decoupled from the rest of Unity as possible so that those
+% components aren't dependant on the Unity environment. This helps ensure that the
+% code is much easier to potentially port to other platforms and environments.
+
+% OLD
+% \section{Programming for the GPU}
+
+% Programming for the GPU posed various challenges, both within the context of
+% working with the Unity game engine and simply the task of maintaining, updating
+% and designing code for it.
+
+% This section describes the general issues faced, and opportunities provided by
+% programming for the GPU. Information on how specific parts of the project were
+% implemented on the GPU can be found in the sections describing those.
+
+% \subsection{Memory}
+
+% % POSSIBLE: add more references
+
+% GPUs typically have a pool of memory that is both distinct and physically
+% separate from the RAM - the pool of memory that a CPU has access to. (However,
+% some devices are beginning to use a unified pool of memory, such as the PS4
+% \cite{DFPS4}.) This pool of memory is referred to as VRAM. However, memory does
+% need to be transferred back and forth from one pool to the other, with the
+% limited bandwidth and latency of the bus used for this being a major bottleneck
+% in a lot of game engines. Therefore, limiting the amount of memory transferred
+% between the two is important, which is was a focus of many of the data
+% structures used in my Wave Particles implementation.
+
+\section{Data-Structures}
+
+I first explain how every component of the Wave Particles system can be
+implemented efficiently in software, giving the overall \textit{Wave Particles
+Pipeline} that is executed in every time step. I then describe the novel
+\texttt{ExtendedHeightField} class that I used to allow for the efficient
+transfer of an image encoding the displacement map from one stage of the
+pipeline to the next - across differing implementations.
+
+I then cover how I implemented each step in the pipeline independently in
+the following sections, explaining in detail how each part was implemented on
+both the CPU and the GPU, and some of the novel data-structures I used to
+optimise them.
+
+\subsection{The Pipeline}
+\label{sec:implementation_pipeline}
+
+Here I describe the pipeline data-structure, a design I used in order
+to encapsulate each part of the implementation.
+
+I considered the Wave Particles system as a pipeline that runs every frame,
+with the state of the Wave Particle system in the previous frame as the input.
+The pipeline has multiple stages, each with a distinct purpose. I designed the
+pipeline so that I could consider what interface each stage needed to provide -
+it formed the framework of the entire project. A diagram of the pipeline is
+given in Figure \ref{fig:pipeline}, where each stage is described.
+
+\begin{figure}[h]
+\centering
+\def\svgwidth{\linewidth}
+\input{images/wave_particles_pipeline.pdf_tex}
+\caption{A diagram of the Wave Particles pipeline. Although some stages may
+implement different strategies, the pipeline is designed around what is shown.
+The Wave Particles are first subdivided and then drawn as point-particles to a
+two-dimensional image which is convolved with a kernel representing the
+displacement function of individual particles. The generated displacement map
+is then used to displace vertices on the water-surface to display the waves.
+This data can then be used in fluid-object interactions.}
+\label{fig:pipeline}
+\end{figure}
+
+I designed the pipeline to be responsible for transferring the inputs of one
+stage to the next, so that each stage could focus on transforming and operating
+on data, without convoluted management. This was done by using the strategy
+pattern, where each stage is abstracted using a C\# interface
+\cite{StrategyPattern}. This ensured that the interfaces of each stage were kept
+clean, allowing me to create, test, and compare multiple implementations of
+each one in isolation.
+
+However, in order to allow this pipeline to be as efficient as possible, I had
+to use a novel data-structure to encode image information that passes through
+each stage in a manner that was efficient and simple to interface with. This is
+described in Section \ref{sec:extended_height_field}.
+
+\subsection{Displacement Map}
+\label{sec:extended_height_field}
+
+Here I explain how I designed a novel data-structure, named
+\texttt{ExtendedHeightField}, to encode displacement map image data. I will
+then explain my goal to avoid unnecessary copying from RAM to VRAM. The
+state machine I used to achieve my goals is then described, before I finally
+justify why I decided to have the data-structure expose its contents directly,
+as opposed to through an interface.
+
+Most stages of the pipeline operate on, or use, the image encoding the
+displacement map representing the water's surface. However, as each stage of
+the pipeline could be independently implemented on either the GPU or CPU, the
+data-structure had to be compatible with both. The class
+\texttt{ExtendedHeightField} acted as an interface between the implementations
+of each stage in the pipeline and the data they were manipulating.
+
+The goal of the data-structure was to dynamically store the height-field data
+in either main memory or GPU memory (or both), as required, such as to minimise
+data copying and unnecessary memory usage. The class dynamically decides
+whether to store the displacement map in RAM or VRAM, either as an array of
+vectors or as a two-dimensional texture respectively. It also has an internal
+state machine (Figure \ref{fig:map_state_machine}) to keep track of which copy
+is most up-to-date so that each version can be lazily-updated as required. This
+state machine ensures that data isn't transferred from VRAM to RAM
+unnecessarily.
+
+\begin{figure}[h]
+\centering
+\def\svgwidth{\linewidth}
+\input{images/extended_heightfield_state_machine.pdf_tex} \caption{A diagram
+showing the state machine used by the \texttt{ExtendedHeightField} to keep
+track of which data is most up to date. \texttt{UA()}, \texttt{GA()},
+\texttt{UT()}, and \texttt{GT()} represent the \texttt{UpdateArray()},
+\texttt{GetArray()}, \texttt{UpdateTexture()}, and \texttt{GetTexture()}
+methods respectively. The dotted lines indicate state-changes that shouldn't
+happen, but can be handled. An example transition is: if the GPU has the most
+up-to-date version of the displacement map (\texttt{GPU\_DIRTY}), then when the
+array is requested (\texttt{GetArray()}), data will automatically be copied
+from VRAM to RAM before being returned. The state of the machine will then be
+updated to \texttt{IN\_SYNC}.}
+\label{fig:map_state_machine}
+\end{figure}
+
+I made the decision to have \texttt{ExtendedHeightField} expose the raw
+displacement map data, as opposed to providing an abstracted interface. This is
+because the pipeline stages need to operate on them directly. Therefore once
+they have completed their changes to either the array or the texture, they must
+call \texttt{UpdateArray()} or \texttt{UpdateTexture()} respectively, in order
+to indicate that.
+
+\subsection{The Wave Particle}
+
+% TODO reference this sectino in challenges
+
+I describe the concrete data-structures I used to encode Wave Particle
+information on both the CPU and GPU.
+
+In C\#, I made the Wave Particle an immutable struct with different fields
+encoding each piece of data. A struct in C\# is almost identical in
+functionality to a class, with one major difference - \textit{structs} are a
+\textit{value type}, while \textit{classes} are stored on the heap akin to
+Java, as a \textit{reference type}. The reason I chose a struct over a class
+was the fact that millions of Wave Particles would potentially be active at
+once. Having a contiguous array of Wave Particles is much better for
+performance than an array of references, as they would lead to an accumulation
+of garbage and a potential increase in cache misses.
+
+\begin{lstlisting}[language={[Sharp]C}]
+public struct WaveParticle
+{
+    public readonly Vector2 origin;
+    public readonly Vector2 velocity;
+    public readonly float amplitude;
+    public readonly float dispersionAngle;
+    public readonly int startingFrame;
+}
+\end{lstlisting}
+
+As the GPU would be handling Wave Particles, and be able to manipulate data sent
+from the CPU, I had to encode each Wave Particle as a struct with an identical
+structure to the C\# version.
+
+\begin{lstlisting}[language={C}]
+struct WaveParticle {
+	float2 origin;
+	float2 velocity;
+	float amplitude;
+	float dispersionAngle;
+	int startingFrame;
+};
+\end{lstlisting}
+
+If the CPU and GPU implementations didn't match identically, copying Wave
+Particle data back-and-forth between the CPU and GPU would not work. I had to
+ensure that all changes made to one were made to the other, as no available
+tools helped enforce this.
+
+\section{Storing, Subdividing, \& Splatting Wave Particles}
+\label{sec:storing_subdividing_splatting}
+
+Here I give an overview of the data-structures I used for
+storing a set of Wave Particles on both the GPU and CPU. Firstly, I cover
+the shared concepts between the two data-structures, and the theory they depend
+on. The algorithms I used for \textit{splatting} Wave Particles to the
+\texttt{ExtendedHeightField} will be covered as well, as the requirements for
+the data-structures are informed by the algorithms.
+
+The data-structures I used for storing Wave Particles differed substantially
+between the CPU and GPU implementations. However, they rely on shared theory
+and do have further commonalities, such as a shared interface in the pipeline
+and similar requirements. The goal was to have a data-structure and associated
+methods, that allowed for the efficient adding, subdividing and reflecting of
+Wave Particles, in addition to quick iteration for the purposes of splatting
+them to an image that could be convolved.
+
+Both the GPU and CPU data-structures implement the \texttt{ParticleContainer}
+interface, shown below.
+
+\begin{lstlisting}[language={[Sharp]C}]
+using System.Collections.Generic;
+public interface ParticleContainer
+{
+    void Initialise(int numParticles, float waveParticleKillThreshold);
+    void AddParticle(WaveParticle particle);
+    void CalculateSubdivisions(int currentFrame);
+    void CalculateReflections(int currentFrame);
+    void SetPointMap(int currentFrame, ref ExtendedHeightField pointMap);
+    void SetWaveParticleKillThreshold(float waveParticleKillThreshold);
+    IEnumerator<WaveParticle> GetEnumerator();
+    void OnDestroy();
+}
+\end{lstlisting}
+
+The interface clarifies the requirements of the data-structures and the
+functionality they need to provide. Furthermore, it also states what the
+data-structures need not provide, avoiding over-generalisation.
+
+\subsection{Subdivision}
+\label{sec:implementation_subdivision}
+
+This section will explain the role subdivision played in informing the design
+of the implementation of the GPU and CPU data-structures.
+
+Wave Particle subdivision needs to be handled by both data-structures. As
+mentioned in Section \ref{sec:subdivision}, the time taken until a Wave
+Particle needs to subdivide can be precomputed based on its speed $u_{wp}$,
+radius $r_{wp}$, and dispersion angle $\theta_{wp}$. This is shown in Equation
+\ref{eq:subdivision_calc}.
+
+\begin{equation}
+\label{eq:subdivision_calc}
+t_s = \frac{r_{wp}}{2 u_{wp} \theta_{wp}}
+\end{equation}
+
+Therefore when adding a Wave Particle, I could pre-compute the frame it
+subdivides in. On every call to the \texttt{CalculateSubdivisions} method, the
+set of Wave Particles due to subdivide is known - allowing me to iterate
+through this small subset.
+
+I had to make two assumptions in order to ensure such pre-computation was
+beneficial.
+
+%TODO: Convert this to a diagram
+The first assumption, is that no subdivision event will occur in more than $m$
+frames' time. This assumption allowed me to use a cyclic fixed-size event-table
+of size $m$ in order to index pre-computed events. However, in the cases where
+$m < \frac{t_s}{\Delta{t}}$ (where $\Delta{t}$ is the frame time), meaning that
+there is no index in the table where that event could be stored, I clamped-down
+$t_s$. The impact of clamping down on subdivision events in cases where the
+assumption is violated is that subdivision can occur more often than is
+strictly necessary. (eg. If a Wave Particle is due to subdivide in the 10th
+frame, that event is stored in the 10th of entry of the event-table.) The entry
+for a particular event is calculated with the expression
+$f+\operatorname{round}{(\operatorname{clamp}(\frac{t_s}{\Delta{t}}))}\pmod{m}$,
+where $f$ indicates the the current frame.
+
+The second assumption is that no more than $n$ Wave Particles are active at the
+same time; done for both computational and memory reasons. In the cases where
+more than $n$ Wave Particles \emph{are} active, some have to killed. This is
+managed through a \textit{kill threshold} - on subdivision, any wave particles
+that have an amplitude below the \textit{kill threshold} are discarded.
+
+\subsection{Reflection of Wave Particles}
+
+Wave Particles can be efficiently reflected off static boundaries in a system
+similarly to subdivision - as Wave Particles have a constant speed the frame in
+which they will be reflected can be pre-computed. As the changes needed are so
+similar to subdivision Wave Particle reflection will not be elaborated on
+further. A screenshot of Wave Particles being reflected off the boundaries of a
+square-shaped enclosure is shown in Figure \ref{fig:wave_particle_reflections}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{wave_particle_reflections}
+\caption{A screen shot of Wave Particles being reflected from my
+implementation.}
+\label{fig:wave_particle_reflections}
+\end{figure}
+
+
+\subsection{CPU Implementation}
+\label{sec:implementation_splat_cpu}
+
+Here I explain how I implemented the \texttt{ParticleContainer}
+interface on the CPU. In particular, explaining how subdivisions were performed
+in an efficient manner using a linked list. Finally, I justify the design
+decisions I made.
+
+I used a contiguous array of size $n$ to store Wave Particle data on the CPU.
+This makes splatting them to a two-dimensional array in preparation for the
+convolution stage both simple and of a fixed cost every frame. The array is
+iterated over and for each Wave Particle, its position for the current frame is
+calculated, and it is then drawn as a point-particle to the texture.
+
+Furthermore, adding new particles to this data-structure is straightforward. I
+treated the array as a cyclical buffer - with a pointer into the head.
+
+In order to handle subdivisions, I used a single array of integers of size $m$,
+the assumed maximum time before subdivision, to encode the event-table
+described in Section \ref{sec:implementation_subdivision}. Each integer in this
+array indexed a Wave Particle due to subdivide in the frame represented by the
+table entry. If no Wave Particles were due to subdivide in a particular frame,
+$-1$ was stored.
+
+%TODO: Check with Alastair! (USE DIAGRAM)
+As in a given frame, multiple Wave Particles could be due to subdivide, I used
+a linked-list. In addition to the event-table, I made a \textit{link-table} of
+integers of size $n$ that mirrored the Wave Particles array. Each entry in this
+table was associated with the particle sharing its index. (eg. the tenth entry
+in the link-table was associated with the tenth Wave Particle.) The entries in
+the link-table represent indices to Wave Particles due to subdivide in the same
+frame, forming a linked list.
+
+In order to perform subdivisions for the current frame, $f$, the approach
+described by the following C-like pseudocode is taken:
+
+\begin{lstlisting}[language={C}]
+void PerformSubdivisions(int f){
+    // retrieve index of the first particle subdividing this frame
+    int particle_index = event_table[f];
+    // reset the event-table entry for the current frame
+    event_table[f] = -1;
+    // while particles are subdividing this frame
+    while(particle_index != -1) {
+        // retrieve particle subdividing this frame, subdivide it
+        WaveParticle particle = particle_array[particle_index];
+        PerformSubdivision(particle);
+
+        // find the next subdividing particle
+        int next_index = link_table[particle_index];
+        // reset current entry in the link_table
+        link_table[particle_index] = -1;
+        // progress
+        current_index = next_index;
+    }
+    return;
+}
+\end{lstlisting}
+
+This setup is optimal for cache performance - originally the indices stored in
+the link-table were stored with their associated Wave Particle in the array
+\cite{Yuksel2007}. However, when splatting Wave Particles, this lead to the
+cache being wasted, as the link data would be loaded with each Wave Particle.
+So the decision was made to separate the two.
+
+Wave Particle reflection can be plugged into the same system. I created a
+separate event-table for particles due to reflect in a given frame, however the
+link-table can be shared with the subdivision system. The reason for this is
+that a Wave Particle cannot both subdivide and reflect in the same frame.
+
+Here I focused on explaining the process of Wave Particle
+subdivision on the CPU - how an event-table and link-table were used to index
+the subset of Wave Particles that were due to subdivide each frame. I then
+explained how this setup improved cache performance over the implementation
+used in the original paper.
+
+\subsection{GPU Implementation}
+
+I describe how I implemented the \texttt{ParticleContainer} interface on
+the GPU. In particular I explain how I used GPU compute shaders in a novel
+manner, both to efficiently splat particles to a texture encoding the
+displacement map and to perform subdivisions.
+
+One of the main goals of storing and operating with Wave Particles on the GPU
+was to make this process as quick and efficient as possible. The way I achieved
+this was to minimise the amount of data that was transferred between the CPU
+and the GPU.
+
+Therefore, the CPU does not store a canonical source of Wave Particles data
+that is copied to the GPU each frame. In fact, the CPU does not store any Wave
+Particle information at all apart from a data-structure that is used for
+handling subdivisions and queued Wave Particle additions. Previously, all Wave
+Particles were stored in an array on the CPU and copied to the GPU every frame
+for the purpose of being splatted to a texture \cite{Yuksel2007}.
+
+I used an implementation of the \texttt{ParticleContainer} interface,
+\texttt{GPUParticleContainer}, to handle all CPU-side code, while HLSL compute
+shaders handled all GPU-side code. The Wave Particles themselves were stored in
+a \texttt{ComputeBuffer} configured at initialise-time to be of the desired
+size.
+
+\subsubsection{Adding Particles}
+
+One challenge was ensuring that adding particles to the GPU-side
+\texttt{ComputeBuffer} was done in an efficient manner. Unity only provides
+interfaces for copying a CPU-side array whole-sale into a
+\texttt{ComputeBuffer}, which as mentioned before would be inefficient.
+
+The efficient workaround to this was to have a CPU-side array that acts as a
+buffer for particle additions. This buffer is flushed to a small
+\texttt{ComputeBuffer} every frame, or if it fills up. A compute shader then
+reads the small \texttt{ComputeBuffer} and adds all Wave Particles within it to
+the main data-structure.
+
+This is efficient as it ensures that rather than Wave Particles being copied
+piecemeal to the GPU, the process is batched. Furthermore, the GPU can load all
+of the batched data in parallel.
+
+\subsubsection{Subdivisions}
+
+% POSSIBLE: Delete Paragraph Below
+This section will cover how subdivision was implemented in an efficient manner
+- using the the strengths of the CPU in order to take advantage of assumptions
+around the Wave Particle system. In addition to minimising the data transferred
+from the CPU to the GPU in order to conserve that bottleneck.
+
+I derived the GPU implementation of subdivision from the CPU one. Whilst the
+GPU performed the subdivisions in parallel, the CPU still handled some of the
+work - in particular walking through the link-table in an iterative manner.
+
+An event-table and link-table were stored as arrays on the CPU, which held the
+information of which Wave Particles were due to subdivide in any particular
+frame, as described in Section \ref{sec:implementation_splat_cpu}. I programmed
+the CPU to walk-through the indices of all the Wave Particles due to subdivide
+in the current frame, storing them all in an array. I passed the array to the
+GPU, which I had programmed to subdivide these particles in parallel. The GPU
+also calculated which frames the new Wave Particles were due to subdivide in.
+This data was copied back to the CPU so that it could be loaded into the
+event-table and link-table.
+
+% POSSIBLE: create figure.
+
+\subsubsection{Splatting Particles}
+% POSSIBLE- Move to Challenges: look at https://blogs.msdn.microsoft.com/ivanne/2012/01/04/multiple-ways-to-render-point-sprites-in-dx11/
+
+Here I cover how Wave Particles are splatted to a texture using compute
+shaders for the next stage of the pipeline, the issues the GPU implementation
+faced, and the different anti-aliasing methods available in addition to their
+benefits and drawbacks.
+
+As shown in my evaluation - the GPU outperforms the CPU in its ability to draw
+many Wave Particles in parallel to a texture as point particles. However, this
+wasn't implemented without issues, as the parallelism led to some unavoidable
+race conditions. Furthermore, efficient approaches to anti-aliasing needed to
+be found.
+
+Wave Particle splatting was implemented using a compute shader. This differed
+from the implementation in the paper which used vertex and pixel shaders
+\cite{Yuksel2007}. The compute shader was extremely simple; each thread being
+responsible for splatting an individual particle to the displacement map
+texture. The shader code calculated the position of the particle on the
+two-dimensional plane.
+
+%TODO: rewrite section, (Yuksel at al.) instead of "implementation in the paper""
+% Yuksel et al achieved the desired implementation using a pixel shader... (CITE PAPER)
+%TODO: look at non-workign reference
+
+%TODO: have figure for artifacting?
+
+There was a race condition when multiple GPU threads wanted to splat a Wave
+Particle to the same pixel. The implementation in the paper did not suffer from
+this, as it used a pixel shader to render point-sprites, which Unity did not
+support \cite{NoPointSpritesUnityOne} \cite{NoPointSpritesUnityTwo}.
+Additionally, the traditional solutions to this problem would have taken too
+long to implement \cite{NoPointSpritesWorkaround}. I splatted the particles to
+a higher resolution texture as a workaround - which reduced the chance of a
+collision. I then wrote a custom shader to downsample this texture to the
+desired resolution - with the added benefit of anti-aliasing. Figure
+\ref{fig:downscale_example} shows an example of this.
+
+% POSSIBLE: make this a diagram in inkscape
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\linewidth]{splat_particles_large}
+\includegraphics[width=0.3\linewidth]{splat_particles_downscale}
+\caption{An example from my implementation of a 200 by 200 pixels texture being
+downsampled to one that is 100 by 100 pixels.}
+\label{fig:downscale_example}
+\end{figure}
+\section{Generating the Displacement Map through Convolution}
+
+%TODO: rewrite section to not use class names?
+Here I cover how the displacement map was generated. This
+covers the techniques available on both the GPU and CPU.
+
+This stage in the pipeline is represented by the \texttt{HeightFieldGenerator}
+interface, with the important method being \texttt{GenerateHeightField()},
+which takes an integer indicating the current frame and an
+\texttt{ExtendedHeightField} instance encoding the results of the previous
+stage. As \texttt{ExtendedHeightField} is a reference type; it is this argument
+that also encodes the final output of this stage in the pipeline - that being
+the final height-field as generated from the splatted Wave Particles.
+
+As mentioned in Section
+\ref{sec:implementation_overview_obtain_displacement_map}, the final
+height-field can be obtained from the splatted Wave Particles using convolution.
+However, the naive approach described in Section
+\ref{sec:implementation_overview_obtain_displacement_map} of obtaining the
+final displacement map was also implemented on the CPU as a reference.
+
+\subsection{CPU Implementation}
+\label{sec:implementation_convolution_cpu}
+
+This section will cover how the final displacement map is generated on the CPU,
+two methods of generating the displacement map were implemented:
+Two-dimensional convolution and a brute-force naive approach.
+
+The brute-force implementation simply iterates through every Wave Particle and
+adds the appropriate displacement to each entry in the
+\texttt{ExtendedHeightField} within the bounds of its radius as described by
+Equation \ref{eq:particle_distortion}. I ensured the brute-force method
+disabled Wave Particle splatting (as it is unnecessary), and this was the first
+part of the Wave Particles system that I implemented.
+
+I implemented the two-dimensional convolution method by pre-calculating a Wave
+Particle kernel and storing it in a two-dimensional array of Vectors. The
+implementation then convolves this kernel with the two-dimensional array stored
+in the \texttt{ExtendedHeightField} input, and then returns the result.
+
+\subsection{GPU Implementation}
+\label{sec:implementation_convolution_gpu}
+
+This was the first part of the Wave Particles system that I decided to
+implement on the GPU. The reason for this being that GPUs are well suited to
+graphical operations, and this could be easily done in a pixel shader as
+opposed to a compute shader.
+
+The convolution kernel is pre-calculated on the CPU into an array using the
+method described in Section \ref{sec:implementation_convolution_cpu}, this
+array in then copied to a texture on the GPU, where it is permanently stored.
+
+When called, the GPU implementation renders a quad textured with the input
+\texttt{ExtendedHeightField} of splatted Wave Particles. This is then convolved
+in the pixel shader and output to a texture (Appendix
+\ref{app:convolution_shader}). Figure \ref{fig:convolution_2D_example} shows
+the result of this on the GPU as obtained from my implementation.
+
+As this was the first part of the project I wrote, encountered some issues
+as described in Section \ref{sec:evaluation_challenges}.
+
+\section{Fluid-Object Interactions}
+
+Here I describe how I generated Wave Particles by calculating the
+volume of water displaced in a given frame, and how buoyancy was calculated
+using submersion. 
+
+The technique I used for fluid-object interaction was to render objects
+orthogonally from a top-down perspective. I programmed the pixel shader to use
+different color channels in the output to encode how submerged front and
+back-facing parts the object were. I then used this information to calculate
+the total submersion of a given object - which was used to calculate the
+buoyancy force.
+
+%TODO(Rafal): Diagram showing what is going on
+
+The pixel shader also had access to the velocity of an object for a given frame,
+this was used to calculate the amount of water displaced in a given frame, with
+Wave Particles of an equivalent volume being generated on the surface.
+
+This implementation could still use a lot of work and be extended, as it
+currently based on some extremely limited heuristics. However, it does lead to
+convincing results.
+%TODO: Reference Figure
+
+\section{Rendering}
+
+This section will explain how I displaced vertices in a plane of triangles in
+order to create a mesh of waves and how I used the Unity renderer to display
+the mesh with convincing reflections.
+
+In order to render the waves in three-dimensions, I placed a plane object in a
+Unity scene. I then wrote a script, that when attached to the object, generates
+a mesh of triangles with a resolution matching that of the image that is used
+to encode the displacement map. I then displaced each vertex by the value
+of the vector encoded in the corresponding pixel of the image. This can be seen
+in Figure \ref{fig:vertex_example}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{vertex_example}
+\caption{An image obtained from my implementation showing the two-dimensional
+texture encoding the displacement map, alongside the generated mesh.}
+\label{fig:vertex_example}
+\end{figure}
+
+I created both a CPU and GPU implementation of the vertex displacement
+algorithm. Which implementation is used can be changed at runtime.
+
+\subsection{Material Appearance}
+
+Although not affecting the physical behaviour of the system, convincing visual
+effects are an important part of fluid animation to show the type of fluid that
+is being represented.
+
+Refractive media such as water reflect a different proportion of light
+depending on the angle at which light hits the surface, with reflection being
+more likely at grazing angles. The equations which describe this, known as the
+Fresnel equations, are typically approximated in real-time rendering using
+Schlick's approximation (Equation \ref{eq:schlick}) \cite{Schlick94}.
+
+\begin{equation} \label{eq:schlick}
+\begin{split}
+R(\theta) & = R_0 + (1 - R_0)(1 - \cos(\theta))^5 \\
+R_0 & = (\frac{n_1 - n_2}{n_1 + n_2})^2
+\end{split}
+\end{equation}
+
+$n_1$ and $n_2$ are the refractive indices of two media, while $\theta$ is the
+difference between the direction of incident light and the normal of the
+interface between the two media. The results of applying Equation
+\ref{eq:schlick} to the project can be seen in Figure
+\ref{fig:wave_particles_fresnel}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{wave_particles_fresnel}
+\caption{An example from this project of Schlick's Approximation being used to
+apply the Fresnel equations to the water. Light from the environment is
+reflected at grazing angles while the waterbed can be seen head-on.}
+\label{fig:wave_particles_fresnel}
+\end{figure}
+
+\section{Profiling \& Optimisation}
+
+% MENTION Profiling
+% MENTION how ExtendedHeightField was optimised
+% MENTION how IEnumerator Garbage collection caused failures.
+% https://msdn.microsoft.com/en-us/library/aa288257(v=vs.71).aspx
+% http://stackoverflow.com/questions/18718399/every-iteration-of-every-foreach-loop-generated-24-bytes-of-garbage-memory
+% http://stackoverflow.com/questions/5486654/allowing-iteration-without-generating-any-garbage
+
+% https://github.com/steve3003/unity-profiler-data-exporter
+
+% Unity Boxes STRUCTS in foreach loops! :(
+%   http://www.gamasutra.com/blogs/WendelinReich/20131109/203841/C_Memory_Management_for_Unity_Developers_part_1_of_3.php
+% )
+
+% Here I explain how I optimised parts of the project, so as to
+% improve the perfomance of my implementation. I first cover how Unity's
+% profiler was used to determine critical paths in the code, then show general
+% problems Unity and GPU programs can have.
+
+% Finally, a couple of optimisation
+% examples will be given, showing what was changed, why, how, the trade-offs that
+% were made, and what the end results were.
+
+% \subsection{Profiler}
+
+Here I describe how the Unity profiler works and how I used it
+to improve the perfomance of my implementation. I also cover the
+limitations of the profiler before explaining how they were overcome.
+
+Profiling is incredibly important in real-time graphics rendering, as it allows
+critical paths and targets for optimisation to be found in a systematic manner.
+Unity provides a \texttt{Profiler} class in the \texttt{UnityEngine.Profiling}
+namespace with \texttt{BeginSample()} and \texttt{EndSample()} static methods
+\cite{UnityProfiler}. The start of a sample can be named with a string, and it
+is up to the programmer to ensure every sample is correctly enclosed.
+
+When running the engine, the profiler will count how often each sample is
+called, its total running time, the running time of each call to to it, the
+amount of heap allocations and more. Importantly, the percentage of time of a
+frame that was spent on a sample is recorded as well. The downside of adding
+samples is that it slows down the program and clutters the code, something
+which is ideally avoided.
+
+As I wanted to keep track of areas of interest when profiling for when it came
+time to evaluate the project; I created a branch in version control which was
+kept up-to-date with the master branch - the only difference being that it
+contained profiling statements around interesting parts of the code.
+
+I found critical paths in the code by profiling the top-level update loop,
+and identifying which calls took the most time each frame. I then iteratively
+drilled down in order to find the program segments that took the most time or
+allocated the most memory.
+
+% OLD: Complete section
+
+% \subsection{Common Unity Issues}
+
+% % OLD: How they were solved
+% As most code written in Unity is C\# - a garbage collected language, there are
+% common pitfalls which can cause many Unity programs to suffer from performance
+% issues. In fact, this has lead to Unity games having a reputation for
+% inconsistent performance - expressed by frequent stuttering and hitching
+% \cite{FirewatchDF} \cite{WhyUnityNeogaf}. However, these issues are by no means
+% unavoidable, with a variety of techniques for avoiding them available when they
+% arise.
+
+% \subsubsection{Garbage Collection}
+
+% The most common cause of performance issues in Unity programs is Garbage
+% Collection, so minimising it is extremely important \cite{UnityPerformanceTipsGamaSutra}
+% \cite{MemoryManagementUnityGamaSutra}.
+
+% \subsubsection{Multithreading}
+
+% Multithreading support in Unity is extremely limited \cite{UnityBadThreading}
+% \cite{FirewatchDF}.
+
+% \subsection{Examples of Optimisation}
+
+% Here I go through process I used to identify and optimise parts
+% of the Wave Particles system, the performance gains these led to, the tradeoffs
+% that had to be made and the challenges that were faced.
+
+% \subsubsection{Convolution CPU Garbage}
+
+% Here...
+
+% \subsubsection{Foreach trouble}
+
+% Unity provides an interface for making classes iterable, so that you can loop
+% over elements of them. Doing so is very straight forward. You simply implement
+% the \texttt{System.Collections.IEnumerable } class. Another options is to use
+% co-routines. However, both of these things so cause issues, as Unity will
+% allocate some memory to the heap each time you iterate over on object that uses
+% these \cite{UnityForeachGarbageStack} \cite{CShaprForeachWithCollections}.
+
+% A solution to this is to implement the interface manually using a struct, as
+% structs in C\# are allocated on the stack instead of the heap
+% \cite{CSharpIterationStructs}. Which is what I did.
+
+% Unfortunately, after doing this, even though the amount of garbage generated
+% had descreased, on profiling there was still garbage being generated.
+
+% After investigation, this was a result of a bug in the C\# compiler that Unity
+% uses \cite{MemoryManagementUnityGamaSutra}. 
+
+\section{Summary}
+
+In this chapter I gave an overview of the theory guiding the implementation -
+specifically some of the approximations and assumptions that could be made in
+order to pre-compute subdivision events and perform convolution to obtain the
+final height-field. I then went into some details about programming for the
+GPU, and how I approached doing that. Following that, I described the data
+structures I used in my implementation before explaining the algorithms and
+systems I used - including how I used compute shaders in a novel manner to
+limit the amount of data transferred between the GPU and CPU. I finally
+explained how I used Unity's profiler in order to optimise the code.
+
+\chapter{Evaluation}
+
+In this chapter, I analyse the memory usage and perfomance of the Wave
+Particles system across the GPU and CPU. I then describe some of the challenges
+I faced, mainly describing in depth the friction that shader programming
+caused. Finally, I analyse the success criteria I set in the project proposal
+and demonstrate how I met them and completed two extensions.
+
+All performance measurements were performed on a Microsoft Surface Book
+containing a 2.60GHz 4-core Intel i7-6600U CPU and 16GBs of Memory. The GPU
+has no commercial equivalent, but is comparable to an 940m entry-level laptop
+GPU by Nvidia in performance \cite{CNETSurfaceBookGPU}
+\cite{HEXUSSurfaceBookGPU}.
+
+\section{Memory}
+\label{sec:evaluation_memory}
+
+Here I explain how I overcame some of the issues caused by the
+C\# garbage collector. I then analyse the memory usage of both the Wave
+Particles container and the displacement map.
+
+% OLD
+% Memory usage is incredibly important in real-time graphics applications as
+% different components in a system need to compete for limited resources.
+% Furthermore, many strategies can exist for solving certain problems with a
+% tradeoff of performance against memory usage.
+
+\subsection{C\# Garbage Collection}
+
+As most code written in Unity is C\# - a garbage collected language, memory
+usage can cause many Unity programs to suffer from performance issues. In fact,
+this has lead to Unity games having a reputation for inconsistent performance -
+expressed by frequent stuttering and hitching \cite{FirewatchDF}
+\cite{WhyUnityNeogaf}. However, I overcame these issues by using object pooling
+\cite{UnityObjectPooling}, which was possible as memory usage in the Wave
+Particles system is constant: All the memory that is required for any
+particular set-up can be pre-allocated at load-time.
+
+\subsection{Wave Particle Container}
+
+The Wave Particle container has two components of independent sizes, a cyclic
+array of Wave Particles (mirrored by the link table) and an event-table. The
+data-structures of the CPU and the GPU implementations have identical memory
+requirements - simply differing in the location where they are stored. I will
+demonstrate why the Wave Particles system is incredibly lightweight and
+therefore suitable for memory-limited real-time systems.
+
+A Wave Particle is $28$ bytes, and each is mirrored by a link table entry of
+$4$ bytes. Therefore, a system of $n$ particles requires one array that is
+$28n$ bytes, with an additional array that is $4n$ bytes large. For example, a
+system with 500,000 Wave Particles will require $13.35MiB$ for the Wave
+Particles array and $2.91MiB$ for the link table.
+
+As discussed in Section \ref{sec:implementation_subdivision}, the size of the
+event-table should be larger than the separation time between most events.
+Equation \ref{eq:subdivision_calc} can be modified and used to determine an
+appropriate size of the table: Given a system where Wave Particles have a given
+radius $r_{wp}$ and speed $u_{wp}$, and the frame time is $t_f$, the size $S$
+of an event-table that can accurately be used to store subdivision events down
+to a given dispersion angle $\theta_{wp}$ is described by Equation
+\ref{eq:subdivision_event_size_calc}.
+
+\begin{equation}
+\label{eq:subdivision_event_size_calc}
+S = \frac{r_{wp}}{2 u_{wp} \theta_{wp} t_f}
+\end{equation}
+
+For example, given $r_{wp}=0.2m$, $u_{wp}=1ms^{-1}$, and $t_f=0.017s$, the time
+until a subdivision event caused by a dispersion angle of 0.0006 radians
+requires an event-table with less than 10,000 entries. This is the approach I
+took, only requiring $40KiB$.
+
+\subsection{Splatting and Convolution - The Displacement Map}
+
+The amount of memory required for splatting and convolution depends on the
+implementation used, the resolution of the displacement map, and the resolution
+of the convolution kernel (if any).
+
+The implementation used affects the number and sizes of copies of the
+displacement map that are required - from the naive CPU implementation
+requiring one copy, to the most effective GPU implementation requiring three
+copies in addition to the convolution kernel.
+
+As the displacement map is represented by an $n$ by $m$ image, where each pixel
+is 16 bytes, the amount of space it occupies is $16nm$ bytes. Therefore in a
+system with a resolution of 100 by 100, the amount of space required for each
+map is 16KiB - which is negligible compared to the size of the Wave Particles
+container.
+
+However, the resolution of the displacement map also affects the size of the
+mesh used to render the water - of which two copies are kept as both inputs and
+outputs of the vertex shader. As the meshes are handled by Unity, I used
+RenderDoc in order to calculate the effect resolution had on the memory;
+looking at the effect different resolutions had on the size of the mesh. The
+size of the mesh was closely correlated to the number of vertices it had, with
+297 to 306 bytes being required per vertex. The raw data can be seen in Figure
+\ref{fig:table_mesh_sizes}. Therefore, in the typical case of a 100 by 100
+displacement map, 2.9MiB is required for the mesh.
+
+\begin{figure}[h]
+\begin{center}
+\begin{tabular}{|c | c c |} 
+\hline
+ Displacement Map Resolution & Size (bytes) & Bytes per Vertex\\ [0.5ex] 
+\hline\hline
+25x100 & 741,312 & 297 \\ 
+\hline
+50x50 & 749,112  & 300 \\
+\hline
+50x100 & 1,513,512 & 303 \\
+\hline
+100x100 & 3,057,912 & 306 \\ [1ex] 
+\hline
+\end{tabular}
+\end{center}
+\caption{Table showing how the resolution of the displacement map affects the
+size the water mesh occupied in memory.}
+\label{fig:table_mesh_sizes}
+\end{figure}
+
+\subsection{Conclusion}
+
+By modern standards, the Wave Particles system has a very light memory
+footprint. A system with 500,000 Wave Particle and a 100 by 100 displacement
+map has a 50MiB footprint - which is $0.6\%$ of the $8GiB$ of memory a typical
+gaming system such as the PlayStation 4 has \cite{DFPS4}. This means that the
+Wave Particles system is suitable for real-time applications from a memory
+usage perspective.
+
+\section{Performance}
+
+Here I evaluate the perfomance of both splatting Wave
+Particles and Convolution - the principle components of the Wave Particles
+system. This will be done by profiling the execution of the functions of
+interest for 300 frames under various conditions - before I analyse the results
+to compare and contrast how both the CPU and the GPU perform.
+
+\subsection{Splatting Wave Particles}
+
+Here the CPU and GPU implementation of Wave Particle Splatting will
+be analysed and compared. The systems will be observed operating for 300
+frames. How the GPU vastly outperforms the CPU will be shown, in addition to
+how the performance gap widens with larger numbers of Wave Particles.
+
+As explained in Section \ref{sec:storing_subdividing_splatting}, Wave Particles
+are splatted as point-particles to an image, and this is defined in the
+\texttt{SetPointMap()} method of an interface named \texttt{ParticleContainer}.
+There are two implementations of this interface, one on the GPU and one on the
+CPU.
+
+In order to compare how the performance of these implementations scaled, I
+captured 300 frames of a system with a systematically increasing number of Wave
+Particles using the Unity Profiler and exported that data using the
+\textit{Unity Profiler Data Exporter} \cite{UnityProfilerDataExporter}. The
+conditions under which the system was profiled are given in Appendix
+\ref{app:performance_graphs_splatting}.
+
+Figure \ref{fig:graph_set_point_map_10000} shows how the system performs over
+time with 10,000 Wave Particles. The GPU, taking $1.64ms$ per frame, has a
+four-fold performance improvement over the CPU's $8.31ms$. Considering a 30FPS
+a performance budget of $33ms$, the GPU implementation would take $4.92\%$ of
+the total.
+
+\begin{figure}[h]
+\centering
+\input{figures/graph_set_point_map_10000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 10,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\label{fig:graph_set_point_map_10000}
+\end{figure}
+
+10,000 Wave Particles is a small number, and can easily lead to obvious
+artifacting as older ones are quickly overwritten by newly generated ones.
+Therefore, Figure \ref{fig:graph_set_point_map_5000000}, with 5,000,000 Wave
+Particles, paints an interesting picture. As more Wave Particles are added to
+the system, the CPU struggles more, going far beyond any semblance of
+reasonable real-time performance. The GPU manages to remain within a
+respectable limit, whilst also being far more consistent at $13.1ms$ - an
+eight-fold time increase over 10,000 Wave Particles, despite the five
+hundred-fold increase in their number.
+
+\begin{figure}[h]
+\centering
+\input{figures/graph_set_point_map_5000000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 5,000,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\label{fig:graph_set_point_map_5000000}
+\end{figure}
+
+Finally, Figure \ref{fig:graph_set_point_map_averages} plots the mean
+performance as the number of Wave Particles varies. I have shown that the GPU
+implementation far outperforms the CPU one, especially for large numbers of
+Wave Particles. Appendix \ref{app:performance_graphs_splatting} shows more
+graphs demonstrating the performance under different conditions.
+
+\begin{figure}[h]
+\centering
+\input{figures/graph_set_point_map_averages.pgf}
+\caption{Graph comparing the mean performance of the GPU and the CPU
+implementations of the Wave Particle container across differing numbers of Wave
+Particles.}
+\label{fig:graph_set_point_map_averages}
+\end{figure}
+
+\subsection{Convolution}
+
+Here I analyse how the resolution of the displacement map affects
+the performance of convolution on both the GPU and the CPU.
+
+The running time of two-dimensional convolution is of the
+order $O(n^2m^2)$, where $n$ and $m$ are the width \& height of the
+displacement map and convolution kernel respectively - the reason for this
+being that every pixel in the resulting displacement map is the product of
+$m^2$ pixels in the input map, a calculation that is done $n^2$ times.
+
+It is worth noting that, keeping all other variables the same, increasing the
+resolution of the displacement map within a system will result in an equivalent
+increase in the kernel resolution, as the Wave Particle radius is unchanged.
+Therefore, in order to analyse what effect an increase in resolution has, I
+profiled the effects of increasing the displacement map resolution, the
+conditions of which are given in Appendix
+\ref{app:performance_graphs_convolution}.
+
+Figure \ref{fig:graph_convolution_2D_GPU_CPU} compares how the performance of
+both the GPU and CPU version of two-dimensional convolution are affected by
+changes in displacement map resolution. It is evident that the GPU vastly
+outperforms the CPU, reaching a perfomance delta of over $300ms$ per frame with
+a resolution of $224$ by $224$.
+
+%TODO: look at a log-scale version of the graph.
+
+\begin{figure}[h]
+\centering
+\input{figures/graph_convolution_2D_GPU_CPU.pgf}
+\caption{Graph comparing the mean performance of the GPU and the CPU
+implementations of two-dimensional convolution while varying the resolution of
+the displacement map. With the lines labelled \textit{NoScale}, the size of the
+water surface in world-space was maintained at $8m$ by $8m$ - therefore the
+size of the convolution kernel changed in proportion to the resolution. With
+\textit{Scale} the convolution kernel was kept at a constant value for
+comparison purposes.}
+\label{fig:graph_convolution_2D_GPU_CPU}
+\end{figure}
+
+The running time increases as expected for performance measurements of the
+system - exhibiting the $O(n^2m^2)$ increases as described above.
+
+\section{Challenges}
+\label{sec:evaluation_challenges}
+
+One of the reasons I engaged in the Wave Particles project was to learn new
+technologies and improve my software engineering skills. I had never written
+C\#, used Unity, performed extensive profiling, or done any graphics
+programming before.
+
+Fortunately, there were no major individual problems that stalled progress
+except the one show in Figure \ref{fig:texture_copy_issues}, which happened
+when attempting to implement convolution on the GPU as described in Section
+\ref{sec:implementation_convolution_gpu}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{texture_copy_issues}
+\caption{An example of the issues that could be posed by shaders with no obvious
+cause of error.}
+\label{fig:texture_copy_issues}
+\end{figure}
+
+However, there were repeated causes of friction which added up over the course
+of the project - most of which were a result of shader programming.
+
+\subsection{Writing Shaders}
+
+Writing shaders was an implementation challenge due to the immaturity of online
+documentation and programming tools.
+
+As most graphics programming is done in commercial environments, online
+documentation was a lot more sparse than I expected. Furthermore, due to the
+rapid development of GPUs, a lot of documentation mentioned features that were
+out-of-date in non-obvious ways \cite{Yuksel2007} \cite{NoPointSpritesUnityOne}
+\cite{NoPointSpritesWorkaround}.
+
+Because no compile- or run-time checks were performed to check the validity
+of data structures shared by the GPU and the CPU, the biggest challenge by far
+was ensuring they were kept in-sync. This extended from maintaining the
+coherency of data-structure definitions in both HLSL and C\#, to ensuring
+strings identifying arguments for the GPU were spelled correctly on the CPU -
+with no mechanisms to detect if any dependencies changed. Fortunately, I
+managed to structure a step-by-step system which prevented this from causing a
+major issue. However, it was completely unnecessary and has led me to be
+interested in analysing this problem as a project in and of itself.
+
+% POSSIBLE: mention how Unity documentation was lacking
+
+\section{Success Criteria}
+
+All the project requirements were met, barring part of one: I managed to create
+a Wave Particle simulation in Unity that ran on both the CPU and GPU. However,
+even though I implemented a basic fluid-object interaction system, I only did
+so for the GPU (Figure \ref{fig:cube_drag_1}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{cube_drag_all}
+\caption{Showing the effects of dragging a cube through the water. From top
+left going clockwise: cube in initial position, then being dragged to the
+right, then being dragged to the left, then finally floating the surface after
+being left to rest.}
+\label{fig:cube_drag_1}
+\end{figure}
+
+I achieved the goal of a GPU-based version of the simulation that ran at least
+30 frames-per-second with 5000 Wave Particles present. In fact, framerates of
+60 frames-per-second were achievable with 5,000,000 Wave Particles present. A
+500-fold increase over the 10,000 particles at 60 frames-per-second in the
+original Wave Particles paper \cite{Yuksel2007}, despite only a 5-to-10-fold
+increase in effective computing power over the \textit{Nvidia GeForce 7900 GTX}
+used in the original paper \cite{GPUComparison}.
+
+Figure \ref{fig:wave_particles_gui} demonstrates my implementation of a
+two-dimensional top-down overlay-visualiser of the system to enable easy
+visualisation, for both explanatory and debugging purposes. Furthermore, a
+basic water renderer for the wavefronts generated by Wave Particles was
+completed, in addition to the extension of implementing the Fresnel effect.
+
+% POSSIBLE: Put this on YouTube?
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{wave_particles_gui}
+\caption{My Wave Particles implementation within Unity, demonstrating a variety
+of features. The overlay-visualiser is shown in the top-left. Furthermore, the
+ability to dynamically change the reflectivity of the water via color-selection
+is shown. Finally, on the right it can be seen how implementations of different
+aspects of the system can be changed at run-time within the editor.}
+\label{fig:wave_particles_gui}
+\end{figure}
+
+I wrote a system to manage the Wave Particles and object placement within the
+Unity editor. This system has the ability to let users choose which
+implementation of different parts of the pipeline are used. Furthermore, I let
+users modify parameters of the system - including the kill threshold, the color
+of the water, the water's transparency and its reflectivity (Figure
+\ref{fig:wave_particles_gui}).
+
+Additionally, I completed measurements comparing the performance of the CPU-
+and GPU-based implementations of specific features and how the number of Wave
+Particles affected the performance of the simulation.
+
+Finally, I enabled Virtual Reality using an Oculus Rift DK2 - which was
+extremely straightforward using Unity's native support.
+%TODO: Add Figure
+
+\section{Summary}
+
+I analysed and compared the performance and memory usage of all the different
+implementations of various parts of the Wave Particles pipeline. Furthermore, I
+looked at how resource usage scaled as various parameters changed - in
+particular how the number of active particles and the resolution of the
+displacement map affected runtime factors. I then discussed some of the
+challenges faced before evaluating whether the project requirements were
+successfully met.
+
+\chapter{Conclusions}
+
+% POSSIBLE: possibly mention how in hindsight it may have been better to choose a
+% different option?
+
+In this project I set out to implement the Wave Particles system for animating
+sufficiently realistic water waves in real-time on the GPU and CPU on top of
+the Unity game engine. Furthermore, the goal was to optimise the system, and
+compare the GPU and CPU implementations to show the performance improvements
+GPUs can achieve.
+
+I have achieved my main goals, not just showing that the system can run at
+least at 30 FPS with 5000 Wave Particles on a laptop GPU - but managing a
+500-fold performance increase with only a 5-to-10 fold increase in computing
+power over the 10,000 Wave Particles at 60 FPS in the original paper by using a
+novel GPU data-structure \cite{Yuksel2007}. I also completed two extensions,
+implementing realistic reflections on the GPU using cubemaps and enabling the
+system in VR. The latter was straight-forward and highlighted one of the
+benefits of using a commercial game engine.
+
+Personally, I also wanted to learn about graphics programming, especially as
+the performance gains it can offer over CPU programs in parallel computation can
+be staggering. I was successful in doing so and the potential benefits of GPU
+programming have been confirmed. However, having learnt so much about the
+subject matter, game engines and graphics programming, I would do some things
+differently in hindsight.
+
+If I were to do the project again, I would not place such a heavy focus on
+comparing the performance of different implementations - specifically across
+the CPU and GPU. I would have oriented my project around implementing the core
+on the GPU, leaving more time, room and flexibility to complete some of the
+extension ideas I had.
+
+% POSSIBLE: expand
+
+In implementing and expanding on Wave Particles, I have built a system which
+has a lot of potential in real-time rendering. The project still excites me and
+I plan on expanding it beyond its purpose as a Part II project going forward.
+
+\section{Future Extensions}
+\label{sec:future_extensions}
+
+There are many possible directions this project could be taken in. In this
+section I describe some of the ideas I had but couldn't complete.
+
+\subsection{Signed Distance Field Reflections}
+
+Reflecting Wave Particles is incredibly limited and only works within a
+rectangular bounded space. However, if there were a way to capture the shape of
+static boundaries in a signed distance field - this could not only be used for
+efficiently determining the location of Wave Particle reflections, but also for
+encoding the shape of the boundaries such that the dispersion angle of Wave
+Particles could be updated to match them.
+
+\subsection{Dynamic Performance-Based Resolution Scaling of the Displacement Map}
+
+The resolution of the displacement map affects the performance of the system
+significantly. Many games use adaptive techniques to lower the resolution of
+the frame-buffer when performance would otherwise suffer. This could
+potentially be applied to the displacement map.
+
+\subsection{Adaptable LoD system for Oceans}
+
+Open oceans are large; having an LoD (Level of Detail) system of different
+\textit{patches} of Wave Particles could be used in order to render boundless
+seas.
+
+\subsection{Planes of Multiple Frequencies}
+
+Multiple planes of Wave Particles could be use to model water waves of
+different frequencies.
+
+\bibliographystyle{unsrt}
+
+\bibliography{references}
+
+\appendix
+
+\chapter{TravisCI}
+\label{app:travisci}
+
+Script that automatically installs Unity.
+
+\begin{lstlisting}[language=Bash]
+#! /bin/sh
+
+# This program installs the version of Unity used to run this project in Travis CI
+
+UNITY_VERSION='5.5.1f1'
+# Use http://unity3d.com/get-unity/download/archive for up-to-date Unity links
+DOWNLOAD_LOCATION='http://netstorage.unity3d.com/unity/88d00a7498cd/MacEditorInstaller/Unity-'"$UNITY_VERSION"'.pkg'
+FILE_NAME='unity.pkg'
+
+echo "Downloading Unity from $DOWNLOAD_LOCATION to $FILE_NAME"
+curl -o Unity.pkg $DOWNLOAD_LOCATION
+
+echo "Installing Unity from $FILE_NAME"
+sudo installer -dumplog -package $FILE_NAME -target /
+\end{lstlisting}
+
+Script that automatically runs all Unity unit tests.
+
+\begin{lstlisting}[language=Bash]
+#! /bin/bash
+ROOT_PROJECT_PATH="$TRAVIS_BUILD_DIR"
+
+UNITY_LOCATION='/Applications/Unity/Unity.app/Contents/MacOS/Unity'
+PROJECT_PATH=$ROOT_PROJECT_PATH'/project/Wave Particles'
+RESULT_LOCATION=$ROOT_PROJECT_PATH
+
+echo "Calling Unit Test script..."
+echo 'source ./scripts/runTests.sh' "$UNITY_LOCATION" "$PROJECT_PATH" "$RESULT_LOCATION"
+source ./scripts/runTests.sh "$UNITY_LOCATION" "$PROJECT_PATH" "$RESULT_LOCATION" python3
+\end{lstlisting}
+
+\chapter{Convolution Shader}
+\label{app:convolution_shader}
+
+The script below shows the shader that was used when convolving Wave Particles. 
+\begin{lstlisting}[language=C]
+sampler2D _MainTex;
+sampler2D _KernelTex;
+float4 _MainTex_ST;
+float _HoriRes;
+float _VertRes;
+float _Width;
+float _Height;
+float _ParticleRadii;
+
+fixed4 frag(v2f i) : SV_Target
+{
+    //// sample the texture
+    const float unitX = _Width / _HoriRes;
+    const float unitY = _Height / _VertRes;
+
+    float4 color = float4(0, 0, 0, 1);
+
+    for (float x = 0; x < _KernelWidth; x++) {
+        for (float y = 0; y < _KernelHeight; y++) {
+            float2 coords = i.uv + float2((x - (_KernelWidth * 0.5))/ _HoriRes, (y - (_KernelHeight * 0.5)) / _VertRes);
+            float4 newVal = tex2D(_MainTex, coords);
+            float4 kernelColor = tex2D(_KernelTex, float2(x / _KernelWidth, y / _KernelHeight));
+            color += newVal.g * kernelColor;
+        }
+    }
+
+    return color;
+}
+\end{lstlisting}
+
+\chapter{Performance Graphs}
+
+\section{Splatting Wave Particles}
+\label{app:performance_graphs_splatting}
+
+The graphs below were profiled under the following conditions:
+
+There were $0$ active Wave Particles in the first frame, every frame a new Wave
+Particle was generated with an amplitude of $0.8m$ and a dispersion angle of
+$2\pi$. The particles were set with a radius of $0.2m$ and a speed of
+$1ms^{-1}$. Finally, the plane had a width and height of $8m$ and resolution of
+100 by 100 pixels/vertices.
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_10000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 10,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_50000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 50,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_100000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 100,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_500000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 500,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_1000000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 1,000,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_5000000.pgf}
+\caption{Graph comparing the performance of the first 300 frames of a system
+with 5,000,000 Wave Particles across the GPU and the CPU implementations of the
+Wave Particle container.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_set_point_map_averages.pgf}
+\caption{Graph comparing the mean performance of the GPU and the CPU
+implementations of the Wave Particle container across differing numbers of Wave
+Particles.}
+\end{figure}
+
+\section{Convolution}
+\label{app:performance_graphs_convolution}
+
+The graphs below were profiled under the following conditions:
+
+The \textit{NoScale} data was obtained from a Wave Particle system with 50, 000
+Wave Particles. $0$ active Wave Particles in the first frame, every frame a new
+Wave Particle was generated with an amplitude of $0.8m$ and a dispersion angle
+of $2\pi$. The particles were set with a radius of $0.2m$ and a speed of
+$1ms^{-1}$. Finally, the plane had a width and height of $8m$.
+
+For the \textit{Scale} data, the plane's width and height were set to $8m$ for
+the 100 by 100 resolution run. For runs of other resolutions, the width and
+height of the plane were proportionally scaled with the resolution of the
+displacement map.
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_convolution_2D_GPU_CPU.pgf}
+\caption{Graph comparing the mean performance of the GPU and the CPU
+implementations of two-dimensional convolution while varying the resolution of
+the displacement map. With \textit{NoScale}, the size of the water surface in
+world-space was maintained at $8m$ by $8m$ - therefore the size of the
+convolution kernel changed in proportion to the resolution. With \textit{Scale}
+the convolution kernel was kept at a constant value.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\input{figures/graph_convolution_2D_GPU.pgf}
+\caption{Graph demonstrating the mean performance of the GPU implementation of
+two-dimensional convolution while varying the resolution of the displacement
+map. With \textit{NoScale}, the size of the water surface in world-space was
+maintained at $8m$ by $8m$ - therefore the size of the convolution kernel
+changed in proportion to the resolution. With \textit{Scale} the convolution
+kernel was kept at a constant value.}
+\end{figure}
+
+% \chapter{Index}
+
+% TODO: The optional index! https://en.wikibooks.org/wiki/LaTeX/Indexing
+
+\chapter{Project Proposal}
+
+\input{proposal-content}
+
+\end{document}

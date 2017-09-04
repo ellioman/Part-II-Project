@@ -1,0 +1,52 @@
+Subject: Phase 1 - Read Cutting: Real-Time Simulation of Water Using a Combination of Height-Map and Particle-Based Simulation Techniques
+
+Phase 1 Project Selection Status Report
+
+Name: Tom Read-Cutting
+
+College: Downing College
+
+User Identifier: tr395
+
+Director of Studies: Dr Robert Harle
+
+Please complete 1, 2 and 3 below.
+
+1. Please write 100 words on your current project ideas.
+
+
+The goal of the project is to independently implement both a 2D height-map based
+water simulation technique and 3D particle-based one that operate in real-time
+on a GPU. The goal is then to compare the performance metrics of both techniques
+and their scalability. Finally, an extension would be to merge the two
+techniques in a system which will dynamically choose which to apply in certain
+situations depending on what works best, something which has been implemented in
+offline systems but not real-time ones. Rendering the results of both techniques
+in a non-trivial way could be another extension.
+
+2. Please list names of potential project supervisors.
+
+
+Dr Rafal Mantiuk (who will additionally reach out to PhD students)
+Huw Bowles (External)
+
+3. Is there any chance that your project will involve any
+computing resources other than the Computing Service's MCS and
+software that is already installed there, for example: your own
+machine, machines in College, special peripherals, imported
+software packages, special hardware, network access, substantial
+extra disc space on the MCS.
+
+If so indicate below what, and what it is needed for.
+
+
+I will be using my own personal computer with a GPU for simulating the water on
+a graphics card. My laptop has (a much weaker one) as well which would still be
+suitable. I have ring fenced money in case any parts fail, and have an agreement
+with Alastair Toft (adt39) to use his computer as a back-up for the simulation
+in case everything fails.
+
+In terms of special software, I'm currently comparing various frameworks and
+packages, from using OpenCL to a full-on game engine such as Unreal Engine 4.
+
+The programming itself can be done on any PC which has a text-editor.

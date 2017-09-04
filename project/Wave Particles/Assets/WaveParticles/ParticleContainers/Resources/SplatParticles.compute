@@ -1,0 +1,77 @@
+﻿#include "Assets/WaveParticles/ParticleContainers/Resources/Utils.compute"
+#include "Assets/WaveParticles/ParticleContainers/Resources/WaveParticleStruct.compute"
+#include "Assets/WaveParticles/ParticleContainers/Resources/WaveParticleStruct.compute"
+
+const int antiAliased;
+const int antiAliasFactor;
+
+const float fixedDeltaTime;
+const int currentFrame;
+const float particleSpeed;
+float2 getPosition(int startingFrame, float2 velocity, float2 origin) {
+	float t = (fixedDeltaTime * (float)(currentFrame - startingFrame));
+	return origin + (t * particleSpeed * velocity);
+}
+
+// TODO: investigate making this an int2?
+const int horiRes;
+const int vertRes;
+const float planeWidth;
+const float planeHeight;
+StructuredBuffer<WaveParticle> waveParticleBuffer;
+RWTexture2D<float4> splatTexture;
+
+///
+/// Splat the wave particles to the splatTexture
+///
+#pragma kernel SplatParticles
+[numthreads(THREAD_GROUPS_X, 1, 1)]
+void SplatParticles(uint3 id : SV_DispatchThreadID)
+{
+	WaveParticle particle = waveParticleBuffer[id.x];
+	float2 waveParticlePosition = getPosition(particle.startingFrame, particle.velocity, particle.origin);
+
+	if (antiAliased == 1) {
+		float xPos = (waveParticlePosition.x / planeWidth) * horiRes;
+		float yPos = (waveParticlePosition.y / planeHeight) * vertRes;
+
+		int col0;
+		int col1;
+		int row0;
+		int row1;
+		{
+			int col = (int)round(xPos);
+			int row = (int)round(yPos);
+			col0 = col - 1;
+			row0 = row - 1;
+			col1 = col;
+			row1 = row;
+		}
+
+		float width0 = 0.5f + col1 - xPos;
+		float width1 = 0.5f + xPos - col1;
+		float height0 = 0.5f + row1 - yPos;
+		float height1 = 0.5f + yPos - row1;
+
+		bool col0InRange = col0 < horiRes && col0 > 0;
+		bool col1InRange = col1 < horiRes && col1 > 0;
+
+		bool row0InRange = row0 < vertRes && row0 > 0;
+		bool row1InRange = row1 < vertRes && row1 > 0;
+
+		if (col0InRange && row0InRange) splatTexture[int2(col0, row0)] += float4(0.0, particle.amplitude * width0 * height0, 0.0, 0.0);
+		if (col1InRange && row0InRange) splatTexture[int2(col1, row0)] += float4(0.0, particle.amplitude * width1 * height0, 0.0, 0.0);
+		if (col0InRange && row1InRange) splatTexture[int2(col0, row1)] += float4(0.0, particle.amplitude * width0 * height1, 0.0, 0.0);
+		if (col1InRange && row1InRange) splatTexture[int2(col1, row1)] += float4(0.0, particle.amplitude * width1 * height1, 0.0, 0.0);
+	}
+	else if (antiAliased == 2) {
+		int xPos = (int)round((waveParticlePosition.x / planeWidth) * horiRes * antiAliasFactor);
+		int yPos = (int)round((waveParticlePosition.y / planeHeight) * vertRes * antiAliasFactor);
+		splatTexture[int2(xPos, yPos)] += float4(0.0, particle.amplitude * antiAliasFactor * antiAliasFactor, 0.0, 0.0);
+	}
+	else {
+		int xPos = (int)round((waveParticlePosition.x / planeWidth) * horiRes);
+		int yPos = (int)round((waveParticlePosition.y / planeHeight) * vertRes);
+		splatTexture[int2(xPos, yPos)] += float4(0.0, particle.amplitude, 0.0, 0.0);
+	}
+}

@@ -1,0 +1,24 @@
+
+
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.bbl
+*.blg
+*.lof
+*.toc
+*.synctex.gz
+
+# Ignore Unit Testing output files
+testOutput/*
+
+*.vscodeLog
+
+# Ignore Unit Testing settings file
+.testsettings
+
+~*
+
+*.pyc
